@@ -1,0 +1,17 @@
+# Frontend (React)
+frontend/node_modules/
+frontend/.env.local
+frontend/build/
+
+# Backend (Spring Boot)
+backend/target/
+backend/.mvn/
+backend/logs/
+backend/application.properties
+backend/application.yml
+
+# Global ignores
+.DS_Store
+.vscode/
+.idea/
+*.iml
