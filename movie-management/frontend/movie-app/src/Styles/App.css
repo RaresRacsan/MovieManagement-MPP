@@ -1,0 +1,109 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.container {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f4f4f4;
+  font-family: Arial, sans-serif;
+}
+
+.image-container {
+  width: 100%;
+}
+
+.cinema-image {
+  width: 100%;
+  height: 600px;
+  display: block;
+}
+
+.title {
+  text-align: left;
+  font-size: 24px;
+  margin: 20px 15px;
+}
+
+.movie-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 0 10px;
+}
+
+.movie-card {
+  width: 100%;
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.movie-content h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.movie-content p {
+  margin: 5px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* Buttons */
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.edit-btn,
+.delete-btn {
+  border: none;
+  padding: 10px;
+  cursor: pointer;
+  font-size: 16px;
+  border-radius: 50%;
+}
+
+.edit-btn {
+  background-color: #323232;
+  color: white;
+}
+
+.delete-btn {
+  background-color: #323232;
+  color: white;
+}
+
+.edit-btn:hover {
+  background-color: #45a049;
+}
+
+.delete-btn:hover {
+  background-color: #c0392b;
+}
+
+.add-btn {
+  background-color: #323232;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 20px auto; 
+  width: fit-content;
+}
+

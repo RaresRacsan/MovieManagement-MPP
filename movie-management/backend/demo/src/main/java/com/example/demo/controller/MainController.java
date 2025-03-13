@@ -18,9 +18,16 @@ public class MainController {
     }
 
     @GetMapping("/main")
+    @CrossOrigin(origins = "http://localhost:3000")
     public List<Movie> getMovies() {
         List<Movie> movies = new ArrayList<>();
         movies = movieRepository.findAll();
         return movies;
+    }
+
+    @PostMapping("/add")
+    @CrossOrigin(origins = "http://localhost:3000")
+    public Movie addMovie(@RequestBody Movie movie) {
+        return movieRepository.save(movie);
     }
 }
