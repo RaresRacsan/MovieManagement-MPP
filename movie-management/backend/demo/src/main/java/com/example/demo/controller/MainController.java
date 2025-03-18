@@ -2,10 +2,15 @@ package com.example.demo.controller;
 
 import com.example.demo.model.Movie;
 import com.example.demo.repository.MovieRepository;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api")
@@ -19,15 +24,63 @@ public class MainController {
 
     @GetMapping("/main")
     @CrossOrigin(origins = "http://localhost:3000")
-    public List<Movie> getMovies() {
-        List<Movie> movies = new ArrayList<>();
-        movies = movieRepository.findAll();
-        return movies;
+    public List<Movie> getAllMovies(@RequestParam(required = false) String sort, @RequestParam(required = false) String search) {
+        Sort sortOrder = Sort.by(Sort.Direction.ASC, "rating");
+        if ("desc".equals(sort)) {
+            sortOrder = Sort.by(Sort.Direction.DESC, "rating");
+        }
+
+        if (search != null && !search.isEmpty()) {
+            return movieRepository.findByTitleContainingIgnoreCase(search, sortOrder);
+        } else {
+            return movieRepository.findAll(sortOrder);
+        }
+    }
+
+    @GetMapping("/movie/{id}")
+    @CrossOrigin(origins = "http://localhost:3000")
+    public ResponseEntity<Movie> getMovieById(@PathVariable Integer id) {
+        return movieRepository.findById(id)
+                .map(movie -> ResponseEntity.ok().body(movie))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping("/add")
     @CrossOrigin(origins = "http://localhost:3000")
-    public Movie addMovie(@RequestBody Movie movie) {
-        return movieRepository.save(movie);
+    public ResponseEntity<Void> addMovie(@RequestBody Movie movie) {
+        try {
+            movieRepository.save(movie);
+            return ResponseEntity.ok().build();
+        }
+        catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @DeleteMapping("/delete/{id}")
+    @CrossOrigin(origins = "http://localhost::3000")
+    public ResponseEntity<Void> deleteMovie(@PathVariable Integer id) {
+        try {
+            movieRepository.deleteById(id);
+            return ResponseEntity.ok().build();
+        }
+        catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PutMapping("/update/{id}")
+    @CrossOrigin(origins = "http://localhost::3000")
+    public ResponseEntity<Object> updateMovie(@PathVariable Integer id, @RequestBody Movie updatedMovie) {
+        return movieRepository.findById(id)
+                .map(movie -> {
+                    movie.setTitle(updatedMovie.getTitle());
+                    movie.setCategory(updatedMovie.getCategory());
+                    movie.setDescription(updatedMovie.getDescription());
+                    movie.setRating(updatedMovie.getRating());
+                    movieRepository.save(movie);
+                    return ResponseEntity.ok().build();
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

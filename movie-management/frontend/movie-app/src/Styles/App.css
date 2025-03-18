@@ -12,13 +12,25 @@
 }
 
 .image-container {
-  width: 100%;
+  position: relative;
+  text-align: center;
+  color: white;
 }
 
 .cinema-image {
   width: 100%;
-  height: 600px;
-  display: block;
+  height: 500px;
+}
+
+.image-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3em;
+  font-weight: bold;
+  color: white;
+  text-shadow: 2px 2px 4px #000000;
 }
 
 .title {
@@ -28,34 +40,56 @@
 }
 
 .movie-list {
-  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  padding: 0 10px;
+  gap: 5px;
+  padding: 10px;
 }
 
-.movie-card {
-  width: 100%;
-  background: white;
-  padding: 15px;
-  border-radius: 8px;
+.movie-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.movie-content h2 {
-  margin: 0;
+  justify-content: space-between;
   font-size: 18px;
-  color: #333;
+  padding: 10px;
 }
 
-.movie-content p {
-  margin: 5px 0;
+.movie-number {
+  font-weight: bold;
+  font-size: 24px;
+  border: 2px solid;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 15px;
+}
+
+.green {
+  color: green;
+  border-color: green;
+}
+
+.blue {
+  color: blue;
+  border-color: blue;
+}
+
+.movie-details {
+  flex-grow: 1;
+}
+
+.movie-details h2 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.movie-details p {
   font-size: 14px;
-  color: #666;
+  margin: 5px 0;
+  color: #555;
 }
 
 /* Buttons */
@@ -107,3 +141,48 @@
   width: fit-content;
 }
 
+.add-btn:hover {
+  background-color: #555;
+}
+
+.sort-options {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.sort-options button {
+  background-color: #323232;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.sort-options button:hover {
+  background-color: #555;
+}
+
+.search-input {
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 15px;
+}
+
+.search-btn {
+  background-color: #323232;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.search-btn:hover {
+  background-color: #555;
+}
