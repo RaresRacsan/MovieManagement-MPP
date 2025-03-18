@@ -19,11 +19,25 @@ function MovieList() {
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
-
+  const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    fetchMovies(searchQuery);
+    fetchAllMovies();
+  }, []);
+
+  useEffect(() => {
+    fetchMovies(searchQuery, sortOrder);
   }, [searchQuery, sortOrder, selectedCategories, selectedRating]);
+
+  const fetchAllMovies = () => {
+    fetch(`http://localhost:8080/api/main`)
+      .then((response) => response.json())
+      .then((data: Movie[]) => {
+        const uniqueCategories = Array.from(new Set(data.map((movie: Movie) => movie.category)));
+        setCategories(uniqueCategories);
+      })
+      .catch((error) => console.error("Error fetching data:", error));
+  };
 
   const fetchMovies = (query: string, order: "asc" | "desc" | null = null) => {
     let url = `http://localhost:8080/api/main?search=${query}`;
@@ -38,7 +52,7 @@ function MovieList() {
     }
     fetch(url)
       .then((response) => response.json())
-      .then((data) => setMovies(data))
+      .then((data: Movie[]) => setMovies(data))
       .catch((error) => console.error("Error fetching data:", error));
   };
 
@@ -78,7 +92,7 @@ function MovieList() {
   const handleRatingChange = (rating: number) => {
     setSelectedRating(rating);
   };
-  
+
   return (
     <div className="container">
       <div className="image-container">
@@ -97,7 +111,9 @@ function MovieList() {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="search-input"
         />
-        <button onClick={toggleFilterMenu} className="filter-btn">Filter</button>
+        <button onClick={toggleFilterMenu} className="filter-btn">
+          Filter
+        </button>
       </div>
 
       {filterMenuOpen && (
@@ -105,7 +121,7 @@ function MovieList() {
           <div className="filter-menu-content">
             <h3>Categories:</h3>
             <div>
-              {["Action", "Comedy", "Drama", "Horror"].map((category) => (
+              {categories.map((category) => (
                 <label key={category}>
                   <input
                     type="checkbox"
@@ -130,7 +146,9 @@ function MovieList() {
                 </label>
               ))}
             </div>
-            <button onClick={toggleFilterMenu} className="close-btn">Close</button>
+            <button onClick={toggleFilterMenu} className="close-btn">
+              Close
+            </button>
           </div>
         </div>
       )}
@@ -138,22 +156,42 @@ function MovieList() {
       <div className="movie-list">
         {movies.map((movie, index) => (
           <div key={movie.id} className="movie-item">
-            <div className={`movie-number ${index % 2 === 0 ? "green" : "blue"}`}> {index + 1}.</div>
+            <div
+              className={`movie-number ${index % 2 === 0 ? "green" : "blue"}`}
+            >
+              {" "}
+              {index + 1}.
+            </div>
             <div className="movie-details">
               <h2>{movie.title}</h2>
-              <p><strong>Category:</strong> {movie.category}</p>
-              <p><strong>Description:</strong> {movie.description}</p>
-              <p><strong>Rating:</strong> ⭐ {movie.rating}/5</p>
+              <p>
+                <strong>Category:</strong> {movie.category}
+              </p>
+              <p>
+                <strong>Description:</strong> {movie.description}
+              </p>
+              <p>
+                <strong>Rating:</strong> ⭐ {movie.rating}/5
+              </p>
             </div>
             <div className="actions">
-              <Link to={`/update/${movie.id}`} className="edit-btn">📝</Link>
-              <button className="delete-btn" onClick={() => handleDelete(movie.id)}>🗑️</button>
+              <Link to={`/update/${movie.id}`} className="edit-btn">
+                📝
+              </Link>
+              <button
+                className="delete-btn"
+                onClick={() => handleDelete(movie.id)}
+              >
+                🗑️
+              </button>
             </div>
           </div>
         ))}
       </div>
 
-      <Link to="/add" className="add-btn">✚ Add New Movie</Link>
+      <Link to="/add" className="add-btn">
+        ✚ Add New Movie
+      </Link>
     </div>
   );
 }
