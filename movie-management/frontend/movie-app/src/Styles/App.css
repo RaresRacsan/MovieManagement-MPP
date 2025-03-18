@@ -110,6 +110,7 @@
 .edit-btn {
   background-color: #323232;
   color: white;
+  text-decoration: none;
 }
 
 .delete-btn {
