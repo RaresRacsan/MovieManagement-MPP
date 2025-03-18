@@ -25,15 +25,22 @@ public class MainController {
     @GetMapping("/main")
     @CrossOrigin(origins = "http://localhost:3000")
     public List<Movie> getAllMovies(@RequestParam(required = false) String sort, @RequestParam(required = false) String search) {
-        Sort sortOrder = Sort.by(Sort.Direction.ASC, "rating");
-        if ("desc".equals(sort)) {
-            sortOrder = Sort.by(Sort.Direction.DESC, "rating");
-        }
-
         if (search != null && !search.isEmpty()) {
-            return movieRepository.findByTitleContainingIgnoreCase(search, sortOrder);
+            if ("asc".equals(sort)) {
+                return movieRepository.findByTitleContainingIgnoreCase(search, Sort.by(Sort.Direction.ASC, "rating"));
+            } else if ("desc".equals(sort)) {
+                return movieRepository.findByTitleContainingIgnoreCase(search, Sort.by(Sort.Direction.DESC, "rating"));
+            } else {
+                return movieRepository.findByTitleContainingIgnoreCase(search);
+            }
         } else {
-            return movieRepository.findAll(sortOrder);
+            if ("asc".equals(sort)) {
+                return movieRepository.findAll(Sort.by(Sort.Direction.ASC, "rating"));
+            } else if ("desc".equals(sort)) {
+                return movieRepository.findAll(Sort.by(Sort.Direction.DESC, "rating"));
+            } else {
+                return movieRepository.findAll();
+            }
         }
     }
 

@@ -18,11 +18,15 @@ function MovieList() {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    fetchMovies(sortOrder, searchQuery);
-  }, [sortOrder, searchQuery]);
+    fetchMovies(searchQuery);
+  }, [searchQuery]);
 
-  const fetchMovies = (order: "asc" | "desc", query: string) => {
-    fetch(`http://localhost:8080/api/main?sort=${order}&search=${query}`)
+  const fetchMovies = (query: string, order: "asc" | "desc" | null = null) => {
+    let url = `http://localhost:8080/api/main?search=${query}`;
+    if (order) {
+      url += `&sort=${order}`;
+    }
+    fetch(url)
       .then((response) => response.json())
       .then((data) => setMovies(data))
       .catch((error) => console.error("Error fetching data:", error));
@@ -39,14 +43,16 @@ function MovieList() {
   };
 
   const toggleSortOrder = () => {
-    setSortOrder((prevOrder) => (prevOrder === "asc" ? "desc" : "asc"));
+    const newOrder = sortOrder === "asc" ? "desc" : "asc";
+    setSortOrder(newOrder);
+    fetchMovies(searchQuery, newOrder);
   };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchMovies(sortOrder, searchQuery);
+    fetchMovies(searchQuery, sortOrder);
   };
-
+  
   return (
     <div className="container">
       <div className="image-container">
