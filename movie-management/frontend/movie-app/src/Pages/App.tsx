@@ -33,7 +33,9 @@ function MovieList() {
     fetch(`http://localhost:8080/api/main`)
       .then((response) => response.json())
       .then((data: Movie[]) => {
-        const uniqueCategories = Array.from(new Set(data.map((movie: Movie) => movie.category)));
+        const uniqueCategories = Array.from(
+          new Set(data.map((movie: Movie) => movie.category))
+        );
         setCategories(uniqueCategories);
       })
       .catch((error) => console.error("Error fetching data:", error));
@@ -93,6 +95,12 @@ function MovieList() {
     setSelectedRating(rating);
   };
 
+  const resetFilters = () => {
+    setSelectedCategories([]);
+    setSelectedRating(null);
+    fetchMovies(searchQuery, sortOrder);
+  };
+
   return (
     <div className="container">
       <div className="image-container">
@@ -146,6 +154,9 @@ function MovieList() {
                 </label>
               ))}
             </div>
+            <button onClick={resetFilters} className="reset-btn">
+              Reset Filters
+            </button>
             <button onClick={toggleFilterMenu} className="close-btn">
               Close
             </button>
