@@ -24,22 +24,41 @@ public class MainController {
 
     @GetMapping("/main")
     @CrossOrigin(origins = "http://localhost:3000")
-    public List<Movie> getAllMovies(@RequestParam(required = false) String sort, @RequestParam(required = false) String search) {
+    public List<Movie> getAllMovies(@RequestParam(required = false) String sort, @RequestParam(required = false) String search, @RequestParam(required = false) List<String> categories, @RequestParam(required = false) Integer rating) {
+        Sort sortOrder = Sort.unsorted();
+        if ("asc".equals(sort)) {
+            sortOrder = Sort.by(Sort.Direction.ASC, "rating");
+        } else if ("desc".equals(sort)) {
+            sortOrder = Sort.by(Sort.Direction.DESC, "rating");
+        }
+
         if (search != null && !search.isEmpty()) {
-            if ("asc".equals(sort)) {
-                return movieRepository.findByTitleContainingIgnoreCase(search, Sort.by(Sort.Direction.ASC, "rating"));
-            } else if ("desc".equals(sort)) {
-                return movieRepository.findByTitleContainingIgnoreCase(search, Sort.by(Sort.Direction.DESC, "rating"));
+            if (categories != null && !categories.isEmpty()) {
+                if (rating != null) {
+                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryInAndRatingGreaterThanEqual(search, categories, rating, sortOrder);
+                } else {
+                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryIn(search, categories, sortOrder);
+                }
             } else {
-                return movieRepository.findByTitleContainingIgnoreCase(search);
+                if (rating != null) {
+                    return movieRepository.findByTitleContainingIgnoreCaseAndRatingGreaterThanEqual(search, rating, sortOrder);
+                } else {
+                    return movieRepository.findByTitleContainingIgnoreCase(search, sortOrder);
+                }
             }
         } else {
-            if ("asc".equals(sort)) {
-                return movieRepository.findAll(Sort.by(Sort.Direction.ASC, "rating"));
-            } else if ("desc".equals(sort)) {
-                return movieRepository.findAll(Sort.by(Sort.Direction.DESC, "rating"));
+            if (categories != null && !categories.isEmpty()) {
+                if (rating != null) {
+                    return movieRepository.findByCategoryInAndRatingGreaterThanEqual(categories, rating, sortOrder);
+                } else {
+                    return movieRepository.findByCategoryIn(categories, sortOrder);
+                }
             } else {
-                return movieRepository.findAll();
+                if (rating != null) {
+                    return movieRepository.findByRatingGreaterThanEqual(rating, sortOrder);
+                } else {
+                    return movieRepository.findAll(sortOrder);
+                }
             }
         }
     }

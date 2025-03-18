@@ -16,15 +16,25 @@ function MovieList() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedRating, setSelectedRating] = useState<number | null>(null);
+
 
   useEffect(() => {
     fetchMovies(searchQuery);
-  }, [searchQuery]);
+  }, [searchQuery, sortOrder, selectedCategories, selectedRating]);
 
   const fetchMovies = (query: string, order: "asc" | "desc" | null = null) => {
     let url = `http://localhost:8080/api/main?search=${query}`;
     if (order) {
       url += `&sort=${order}`;
+    }
+    if (selectedCategories.length > 0) {
+      url += `&categories=${selectedCategories.join(",")}`;
+    }
+    if (selectedRating !== null) {
+      url += `&rating=${selectedRating}`;
     }
     fetch(url)
       .then((response) => response.json())
@@ -42,15 +52,31 @@ function MovieList() {
       .catch((error) => console.error("Error deleting movie:", error));
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchMovies(searchQuery, sortOrder);
+  };
+
   const toggleSortOrder = () => {
     const newOrder = sortOrder === "asc" ? "desc" : "asc";
     setSortOrder(newOrder);
     fetchMovies(searchQuery, newOrder);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchMovies(searchQuery, sortOrder);
+  const toggleFilterMenu = () => {
+    setFilterMenuOpen(!filterMenuOpen);
+  };
+
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategories((prevCategories) =>
+      prevCategories.includes(category)
+        ? prevCategories.filter((cat) => cat !== category)
+        : [...prevCategories, category]
+    );
+  };
+
+  const handleRatingChange = (rating: number) => {
+    setSelectedRating(rating);
   };
   
   return (
@@ -59,8 +85,6 @@ function MovieList() {
         <img src="/cinema.jpg" alt="Cinema" className="cinema-image" />
         <div className="image-text">Welcome to My Movie Management App</div>
       </div>
-
-      <h1 className="title">List Of All Movies</h1>
 
       <div className="sort-options">
         <button onClick={toggleSortOrder}>
@@ -73,7 +97,43 @@ function MovieList() {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="search-input"
         />
+        <button onClick={toggleFilterMenu} className="filter-btn">Filter</button>
       </div>
+
+      {filterMenuOpen && (
+        <div className="filter-menu">
+          <div className="filter-menu-content">
+            <h3>Categories:</h3>
+            <div>
+              {["Action", "Comedy", "Drama", "Horror"].map((category) => (
+                <label key={category}>
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(category)}
+                    onChange={() => handleCategoryChange(category)}
+                  />
+                  {category}
+                </label>
+              ))}
+            </div>
+            <h3>Rating:</h3>
+            <div>
+              {[1, 2, 3, 4].map((rating) => (
+                <label key={rating}>
+                  <input
+                    type="radio"
+                    name="rating"
+                    checked={selectedRating === rating}
+                    onChange={() => handleRatingChange(rating)}
+                  />
+                  {`> ${rating}`}
+                </label>
+              ))}
+            </div>
+            <button onClick={toggleFilterMenu} className="close-btn">Close</button>
+          </div>
+        </div>
+      )}
 
       <div className="movie-list">
         {movies.map((movie, index) => (
