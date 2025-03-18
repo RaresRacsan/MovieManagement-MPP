@@ -42,7 +42,8 @@ function MovieList() {
     setSortOrder((prevOrder) => (prevOrder === "asc" ? "desc" : "asc"));
   };
 
-  const handleSearch = () => {
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
     fetchMovies(sortOrder, searchQuery);
   };
 

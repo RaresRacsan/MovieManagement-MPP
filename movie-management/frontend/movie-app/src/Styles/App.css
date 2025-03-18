@@ -36,7 +36,7 @@
 .title {
   text-align: left;
   font-size: 24px;
-  margin: 20px 15px;
+  margin: 20px 20px;
 }
 
 .movie-list {
@@ -147,9 +147,10 @@
 
 .sort-options {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 10px;
   margin-bottom: 20px;
+  margin-left: 20px;
 }
 
 .sort-options button {
@@ -171,18 +172,9 @@
   font-size: 16px;
   border: 1px solid #ccc;
   border-radius: 15px;
+  width: 400px;
 }
 
-.search-btn {
-  background-color: #323232;
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 15px;
-  cursor: pointer;
-  font-size: 16px;
-}
-
-.search-btn:hover {
-  background-color: #555;
+.search-input:focus {
+  outline-color: #323232;
 }
