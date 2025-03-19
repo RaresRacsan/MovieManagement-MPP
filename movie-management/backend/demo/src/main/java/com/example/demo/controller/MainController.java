@@ -24,12 +24,18 @@ public class MainController {
 
     @GetMapping("/main")
     @CrossOrigin(origins = "http://localhost:3000")
-    public List<Movie> getAllMovies(@RequestParam(required = false) String sort, @RequestParam(required = false) String search, @RequestParam(required = false) List<String> categories, @RequestParam(required = false) Integer rating) {
+    public List<Movie> getAllMovies(@RequestParam(required = false) String sort, @RequestParam(required = false) String search, @RequestParam(required = false) List<String> categories, @RequestParam(required = false) Integer rating, @RequestParam(required = false) String alphabetical) {
         Sort sortOrder = Sort.unsorted();
         if ("asc".equals(sort)) {
             sortOrder = Sort.by(Sort.Direction.ASC, "rating");
         } else if ("desc".equals(sort)) {
             sortOrder = Sort.by(Sort.Direction.DESC, "rating");
+        }
+
+        if ("asc".equals(alphabetical)) {
+            sortOrder = Sort.by(Sort.Direction.ASC, "title");
+        } else if ("desc".equals(alphabetical)) {
+            sortOrder = Sort.by(Sort.Direction.DESC, "title");
         }
 
         if (search != null && !search.isEmpty()) {

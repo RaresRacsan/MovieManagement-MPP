@@ -20,14 +20,15 @@ function MovieList() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  const [alphabeticalOrder, setAlphabeticalOrder] = useState<"asc" | "desc" | null>(null);
 
   useEffect(() => {
     fetchAllMovies();
   }, []);
 
   useEffect(() => {
-    fetchMovies(searchQuery, sortOrder);
-  }, [searchQuery, sortOrder, selectedCategories, selectedRating]);
+    fetchMovies(searchQuery, sortOrder, alphabeticalOrder);
+  }, [searchQuery, sortOrder, alphabeticalOrder, selectedCategories, selectedRating]);
 
   const fetchAllMovies = () => {
     fetch(`http://localhost:8080/api/main`)
@@ -41,10 +42,13 @@ function MovieList() {
       .catch((error) => console.error("Error fetching data:", error));
   };
 
-  const fetchMovies = (query: string, order: "asc" | "desc" | null = null) => {
+  const fetchMovies = (query: string, order: "asc" | "desc" | null = null, alphabeticalOrder: "asc" | "desc" | null = null) => {
     let url = `http://localhost:8080/api/main?search=${query}`;
-    if (order) {
-      url += `&sort=${order}`;
+    if (sortOrder) {
+      url += `&sort=${sortOrder}`;
+    }
+    if(alphabeticalOrder) {
+      url += `&alphabetical=${alphabeticalOrder}`;
     }
     if (selectedCategories.length > 0) {
       url += `&categories=${selectedCategories.join(",")}`;
@@ -68,15 +72,16 @@ function MovieList() {
       .catch((error) => console.error("Error deleting movie:", error));
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchMovies(searchQuery, sortOrder);
-  };
-
   const toggleSortOrder = () => {
     const newOrder = sortOrder === "asc" ? "desc" : "asc";
     setSortOrder(newOrder);
-    fetchMovies(searchQuery, newOrder);
+    fetchMovies(searchQuery, newOrder, alphabeticalOrder);
+  };
+
+  const toggleAlphabeticalOrder = () => {
+    const newOrder = alphabeticalOrder === "asc" ? "desc" : "asc";
+    setAlphabeticalOrder(newOrder);
+    fetchMovies(searchQuery, sortOrder, newOrder);
   };
 
   const toggleFilterMenu = () => {
@@ -98,7 +103,7 @@ function MovieList() {
   const resetFilters = () => {
     setSelectedCategories([]);
     setSelectedRating(null);
-    fetchMovies(searchQuery, sortOrder);
+    fetchMovies(searchQuery, sortOrder, alphabeticalOrder);
   };
 
   return (
@@ -111,6 +116,9 @@ function MovieList() {
       <div className="sort-options">
         <button onClick={toggleSortOrder}>
           Sort by Rating {sortOrder === "asc" ? "↑" : "↓"}
+        </button>
+        <button onClick={toggleAlphabeticalOrder}>
+          Sort Alphabetically {alphabeticalOrder === "asc" ? "A-Z" : "Z-A"}
         </button>
         <input
           type="text"

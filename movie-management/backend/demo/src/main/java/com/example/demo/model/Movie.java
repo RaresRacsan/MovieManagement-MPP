@@ -7,7 +7,7 @@ import jakarta.persistence.*;
 public class Movie {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long id;
+    private int id;
 
     @Column(name = "title", nullable = false)
     private String title;
@@ -30,7 +30,7 @@ public class Movie {
         this.category = category;
     }
 
-    public long getId() {
+    public int getId() {
         return this.id;
     }
 
@@ -50,7 +50,7 @@ public class Movie {
         return this.category;
     }
 
-    public void setId(long id) {
+    public void setId(int id) {
         this.id = id;
     }
 
