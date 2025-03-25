@@ -4,6 +4,8 @@ import "../Styles/App.css";
 import AddMovie from "./AddMovies";
 import UpdateMovie from "./UpdateMovies";
 
+import Charts from "./Charts";
+
 interface Movie {
   id: number;
   title: string;
@@ -270,6 +272,8 @@ function MovieList() {
       <Link to="/add" className="add-btn">
         ✚ Add New Movie
       </Link>
+
+      <Charts movies={movies} />
     </div>
   );
 }
