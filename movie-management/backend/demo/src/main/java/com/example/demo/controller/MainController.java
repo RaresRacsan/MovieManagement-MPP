@@ -69,7 +69,12 @@ public class MainController {
         }
     }
 
-    @GetMapping("/movie/{id}")
+    public List<Movie> getAllMovies() {
+        return movieRepository.findAll();
+    }
+
+
+        @GetMapping("/movie/{id}")
     @CrossOrigin(origins = "http://localhost:3000")
     public ResponseEntity<Movie> getMovieById(@PathVariable Integer id) {
         return movieRepository.findById(id)

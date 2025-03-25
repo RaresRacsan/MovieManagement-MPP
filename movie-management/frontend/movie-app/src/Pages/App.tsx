@@ -20,7 +20,12 @@ function MovieList() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
-  const [alphabeticalOrder, setAlphabeticalOrder] = useState<"asc" | "desc" | null>(null);
+  const [alphabeticalOrder, setAlphabeticalOrder] = useState<
+    "asc" | "desc" | null
+  >(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const moviesPerPage = 3;
 
   useEffect(() => {
     fetchAllMovies();
@@ -28,7 +33,13 @@ function MovieList() {
 
   useEffect(() => {
     fetchMovies(searchQuery, sortOrder, alphabeticalOrder);
-  }, [searchQuery, sortOrder, alphabeticalOrder, selectedCategories, selectedRating]);
+  }, [
+    searchQuery,
+    sortOrder,
+    alphabeticalOrder,
+    selectedCategories,
+    selectedRating,
+  ]);
 
   const fetchAllMovies = () => {
     fetch(`http://localhost:8080/api/main`)
@@ -42,12 +53,16 @@ function MovieList() {
       .catch((error) => console.error("Error fetching data:", error));
   };
 
-  const fetchMovies = (query: string, order: "asc" | "desc" | null = null, alphabeticalOrder: "asc" | "desc" | null = null) => {
+  const fetchMovies = (
+    query: string,
+    order: "asc" | "desc" | null = null,
+    alphabeticalOrder: "asc" | "desc" | null = null
+  ) => {
     let url = `http://localhost:8080/api/main?search=${query}`;
     if (sortOrder) {
       url += `&sort=${sortOrder}`;
     }
-    if(alphabeticalOrder) {
+    if (alphabeticalOrder) {
       url += `&alphabetical=${alphabeticalOrder}`;
     }
     if (selectedCategories.length > 0) {
@@ -75,14 +90,16 @@ function MovieList() {
   const toggleSortOrder = () => {
     const newOrder = sortOrder === "asc" ? "desc" : "asc";
     setSortOrder(newOrder);
-    fetchMovies(searchQuery, newOrder, alphabeticalOrder);
-  };
+    setAlphabeticalOrder(null);
+    fetchMovies(searchQuery, newOrder, null);
+  };  
 
   const toggleAlphabeticalOrder = () => {
     const newOrder = alphabeticalOrder === "asc" ? "desc" : "asc";
     setAlphabeticalOrder(newOrder);
-    fetchMovies(searchQuery, sortOrder, newOrder);
+    fetchMovies(searchQuery, null, newOrder);
   };
+  
 
   const toggleFilterMenu = () => {
     setFilterMenuOpen(!filterMenuOpen);
@@ -105,6 +122,24 @@ function MovieList() {
     setSelectedRating(null);
     fetchMovies(searchQuery, sortOrder, alphabeticalOrder);
   };
+
+  const getRatingClass = (rating: number) => {
+    const ratings = movies.map((movie) => movie.rating);
+    const maxRating = Math.max(...ratings);
+    const minRating = Math.min(...ratings);
+    const midRating = ratings.sort((a, b) => a - b)[
+      Math.floor(ratings.length / 2)
+    ];
+
+    if (rating === maxRating) return "highest-rating";
+    if (rating === minRating) return "lowest-rating";
+    if (rating === midRating) return "mid-rating";
+    return "";
+  };
+
+  const indexOfLastMovie = currentPage * moviesPerPage;
+  const indexOfFirstMovie = indexOfLastMovie - moviesPerPage;
+  const currentMovies = movies.slice(indexOfFirstMovie, indexOfLastMovie);
 
   return (
     <div className="container">
@@ -173,7 +208,7 @@ function MovieList() {
       )}
 
       <div className="movie-list">
-        {movies.map((movie, index) => (
+        {currentMovies.map((movie, index) => (
           <div key={movie.id} className="movie-item">
             <div
               className={`movie-number ${index % 2 === 0 ? "green" : "blue"}`}
@@ -181,7 +216,7 @@ function MovieList() {
               {" "}
               {index + 1}.
             </div>
-            <div className="movie-details">
+            <div className={`movie-details ${getRatingClass(movie.rating)}`}>
               <h2>{movie.title}</h2>
               <p>
                 <strong>Category:</strong> {movie.category}
@@ -206,6 +241,30 @@ function MovieList() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="pagination">
+        <button
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+          className="page-btn"
+        >
+          ◀ Prev
+        </button>
+        <span>
+          Page {currentPage} of {Math.ceil(movies.length / moviesPerPage)}
+        </span>
+        <button
+          onClick={() =>
+            setCurrentPage((prev) =>
+              Math.min(prev + 1, Math.ceil(movies.length / moviesPerPage))
+            )
+          }
+          disabled={currentPage === Math.ceil(movies.length / moviesPerPage)}
+          className="page-btn"
+        >
+          Next ▶
+        </button>
       </div>
 
       <Link to="/add" className="add-btn">

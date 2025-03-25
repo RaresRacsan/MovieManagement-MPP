@@ -260,3 +260,46 @@
 .close-btn:hover {
   background-color: #555;
 }
+
+.highest-rating {
+  background-color: #d4edda; /* Light green */
+}
+
+.mid-rating {
+  background-color: #fff3cd; /* Light yellow */
+}
+
+.lowest-rating {
+  background-color: #f8d7da; /* Light red */
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 20px;
+}
+
+.page-btn {
+  background-color: #323232;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 16px;
+  margin: 0 5px;
+}
+
+.page-btn.active {
+  background-color: #555;
+}
+
+.page-btn:hover {
+  background-color: #555;
+}
+
+.page-info {
+  margin: 0 10px;
+  font-size: 16px;
+}
