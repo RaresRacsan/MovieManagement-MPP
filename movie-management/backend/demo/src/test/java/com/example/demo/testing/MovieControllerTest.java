@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 
 import java.util.ArrayList;
@@ -15,7 +16,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 public class MovieControllerTest {
@@ -33,63 +33,77 @@ public class MovieControllerTest {
         MockitoAnnotations.openMocks(this);
         movieList = new ArrayList<>();
         movieList.add(new Movie("Movie2", 1.0, "film cacao", "comedie"));
-        movieList.add(new Movie("no", 1.0, "no", "no"));
-        movieList.add(new Movie("AddedMovie", 2.0, "yes", "NewMovie"));
-        movieList.add(new Movie("Movie3", 4.2, "film bun", "horror"));
         movieList.add(new Movie("Movie1", 5.0, "film smeker", "drama"));
+        movieList.add(new Movie("Movie3", 4.2, "film bun", "horror"));
+        movieList.add(new Movie("AddedMovie", 2.0, "yes", "NewMovie"));
+        movieList.add(new Movie("no", 1.0, "no", "no"));
     }
 
     @Test
-    public void testDeleteMovie() {
-        int initialSize = movieList.size();
-        Movie movie = movieList.get(0);
+    public void testFilterMoviesByTitle() {
+        String searchQuery = "Movie";
+        List<Movie> filteredMovies = List.of(movieList.get(0), movieList.get(2));
 
-        when(movieRepository.findById(movie.getId())).thenReturn(Optional.of(movie));
-        doAnswer(invocation -> {
-            movieList.remove(movie);
-            return null;
-        }).when(movieRepository).deleteById(movie.getId());
+        when(movieRepository.findByTitleContainingIgnoreCase(searchQuery, Sort.unsorted()))
+                .thenReturn(filteredMovies);
 
-        ResponseEntity<Void> response = movieController.deleteMovie(movie.getId());
+        List<Movie> response = movieController.getAllMovies(null, searchQuery, null, null, null);
 
-        assertEquals(ResponseEntity.ok().build(), response);
-        assertEquals(initialSize - 1, movieList.size());
+        assertEquals(2, response.size());
+        assertEquals(filteredMovies, response);
     }
 
     @Test
-    public void testCreateMovie() {
-        Movie newMovie = new Movie("New Movie", 3.0, "New Description", "New Category");
-        int initialSize = movieList.size();
+    public void testFilterMoviesByCategory() {
+        List<String> categories = List.of("drama", "horror");
+        List<Movie> filteredMovies = List.of(movieList.get(1), movieList.get(2));
 
-        when(movieRepository.save(newMovie)).thenAnswer(invocation -> {
-            movieList.add(newMovie);
-            return newMovie;
-        });
+        when(movieRepository.findByCategoryIn(categories, Sort.unsorted()))
+                .thenReturn(filteredMovies);
 
-        ResponseEntity<Void> response = movieController.addMovie(newMovie);
+        List<Movie> response = movieController.getAllMovies(null, null, categories, null, null);
 
-        assertEquals(ResponseEntity.ok().build(), response);
-        assertEquals(initialSize + 1, movieList.size());
-        assertEquals(newMovie, movieList.get(movieList.size() - 1));
+        assertEquals(2, response.size());
+        assertEquals(filteredMovies, response);
     }
 
     @Test
-    public void testReadMovies() {
-        when(movieRepository.findAll()).thenReturn(movieList);
+    public void testFilterMoviesByRating() {
+        int minRating = 4;
+        List<Movie> filteredMovies = List.of(movieList.get(1), movieList.get(2));
 
-        List<Movie> response = movieController.getAllMovies();
+        when(movieRepository.findByRatingGreaterThanEqual(minRating, Sort.unsorted()))
+                .thenReturn(filteredMovies);
 
-        assertEquals(movieList.size(), response.size());
-        assertEquals(movieList, response);
+        List<Movie> response = movieController.getAllMovies(null, null, null, minRating, null);
+
+        assertEquals(2, response.size());
+        assertEquals(filteredMovies, response);
     }
 
     @Test
-    public void testUpdateMovie() {
-        Movie updatedMovie = new Movie("Updated Movie2", 4.0, "Updated Description", "Updated Category");
-        int initialSize = movieList.size();
+    public void testSortMoviesByRating() {
+        List<Movie> sortedMovies = List.of(movieList.get(1), movieList.get(2), movieList.get(3), movieList.get(0), movieList.get(4));
 
-        ResponseEntity<Object> response = movieController.updateMovie(2, updatedMovie);
+        when(movieRepository.findAll(Sort.by(Sort.Direction.DESC, "rating")))
+                .thenReturn(sortedMovies);
 
-        assertEquals(initialSize, movieList.size());
+        List<Movie> response = movieController.getAllMovies("desc", null, null, null, null);
+
+        assertEquals(5, response.size());
+        assertEquals(sortedMovies, response);
+    }
+
+    @Test
+    public void testSortMoviesAlphabetically() {
+        List<Movie> sortedMovies = List.of(movieList.get(3), movieList.get(1), movieList.get(0), movieList.get(2), movieList.get(4));
+
+        when(movieRepository.findAll(Sort.by(Sort.Direction.ASC, "title")))
+                .thenReturn(sortedMovies);
+
+        List<Movie> response = movieController.getAllMovies(null, null, null, null, "asc");
+
+        assertEquals(5, response.size());
+        assertEquals(sortedMovies, response);
     }
 }

@@ -8,9 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api")
@@ -91,13 +89,16 @@ public class MainController {
     }
 
     @PostMapping("/add")
-    @CrossOrigin(origins = "http://localhost:3000")
-    public ResponseEntity<Void> addMovie(@RequestBody Movie movie) {
+    public ResponseEntity<Object> addMovie(@RequestBody Movie movie) {
+        Map<String, String> errors = validateMovie(movie);
+        if (!errors.isEmpty()) {
+            return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
+        }
+
         try {
             movieRepository.save(movie);
             return ResponseEntity.ok().build();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -115,18 +116,24 @@ public class MainController {
     }
 
     @PutMapping("/update/{id}")
-    @CrossOrigin(origins = "http://localhost::3000")
     public ResponseEntity<Object> updateMovie(@PathVariable Integer id, @RequestBody Movie updatedMovie) {
-        return movieRepository.findById(id)
-                .map(movie -> {
-                    movie.setTitle(updatedMovie.getTitle());
-                    movie.setCategory(updatedMovie.getCategory());
-                    movie.setDescription(updatedMovie.getDescription());
-                    movie.setRating(updatedMovie.getRating());
-                    movieRepository.save(movie);
-                    return ResponseEntity.ok().build();
-                })
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        Map<String, String> errors = validateMovie(updatedMovie);
+        if (!errors.isEmpty()) {
+            return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
+        }
+
+        Optional<Movie> existingMovie = movieRepository.findById(id);
+        if (existingMovie.isPresent()) {
+            Movie movie = existingMovie.get();
+            movie.setTitle(updatedMovie.getTitle());
+            movie.setRating(updatedMovie.getRating());
+            movie.setDescription(updatedMovie.getDescription());
+            movie.setCategory(updatedMovie.getCategory());
+            movieRepository.save(movie);
+            return ResponseEntity.ok().build();
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @GetMapping("/movies/sort")
@@ -171,5 +178,31 @@ public class MainController {
                 }
             }
         }
+    }
+
+    private Map<String, String> validateMovie(Movie movie) {
+        Map<String, String> errors = new HashMap<>();
+
+        if (movie.getTitle() == null || movie.getTitle().trim().isEmpty()) {
+            errors.put("title", "Title is required and cannot be empty.");
+        } else if (movie.getTitle().length() > 100) {
+            errors.put("title", "Title must not exceed 100 characters.");
+        }
+
+        if (movie.getRating() < 1 || movie.getRating() > 5) {
+            errors.put("rating", "Rating must be between 1 and 5.");
+        }
+
+        if (movie.getDescription() == null || movie.getDescription().trim().isEmpty()) {
+            errors.put("description", "Description is required and cannot be empty.");
+        } else if (movie.getDescription().length() > 500) {
+            errors.put("description", "Description must not exceed 500 characters.");
+        }
+
+        if (movie.getCategory() == null || movie.getCategory().trim().isEmpty()) {
+            errors.put("category", "Category is required and cannot be empty.");
+        }
+
+        return errors;
     }
 }
