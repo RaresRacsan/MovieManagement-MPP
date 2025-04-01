@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import "../Styles/App.css";
 import AddMovie from "./AddMovies";
 import UpdateMovie from "./UpdateMovies";
-
 import Charts from "./Charts";
 
 interface Movie {
@@ -94,14 +93,13 @@ function MovieList() {
     setSortOrder(newOrder);
     setAlphabeticalOrder(null);
     fetchMovies(searchQuery, newOrder, null);
-  };  
+  };
 
   const toggleAlphabeticalOrder = () => {
     const newOrder = alphabeticalOrder === "asc" ? "desc" : "asc";
     setAlphabeticalOrder(newOrder);
     fetchMovies(searchQuery, null, newOrder);
   };
-  
 
   const toggleFilterMenu = () => {
     setFilterMenuOpen(!filterMenuOpen);

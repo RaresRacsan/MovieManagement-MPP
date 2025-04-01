@@ -24,20 +24,29 @@ public class MainController {
 
     @GetMapping("/main")
     @CrossOrigin(origins = "http://localhost:3000")
-    public List<Movie> getAllMovies(@RequestParam(required = false) String sort, @RequestParam(required = false) String search, @RequestParam(required = false) List<String> categories, @RequestParam(required = false) Integer rating, @RequestParam(required = false) String alphabetical) {
+    public List<Movie> getAllMovies(
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) List<String> categories,
+            @RequestParam(required = false) Integer rating,
+            @RequestParam(required = false) String alphabetical) {
         Sort sortOrder = Sort.unsorted();
+
+        // Handle sorting by rating
         if ("asc".equals(sort)) {
             sortOrder = Sort.by(Sort.Direction.ASC, "rating");
         } else if ("desc".equals(sort)) {
             sortOrder = Sort.by(Sort.Direction.DESC, "rating");
         }
 
+        // Handle alphabetical sorting
         if ("asc".equals(alphabetical)) {
             sortOrder = Sort.by(Sort.Direction.ASC, "title");
         } else if ("desc".equals(alphabetical)) {
             sortOrder = Sort.by(Sort.Direction.DESC, "title");
         }
 
+        // Handle filtering
         if (search != null && !search.isEmpty()) {
             if (categories != null && !categories.isEmpty()) {
                 if (rating != null) {
@@ -73,8 +82,7 @@ public class MainController {
         return movieRepository.findAll();
     }
 
-
-        @GetMapping("/movie/{id}")
+    @GetMapping("/movie/{id}")
     @CrossOrigin(origins = "http://localhost:3000")
     public ResponseEntity<Movie> getMovieById(@PathVariable Integer id) {
         return movieRepository.findById(id)
@@ -119,5 +127,49 @@ public class MainController {
                     return ResponseEntity.ok().build();
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/movies/sort")
+    public List<Movie> sortMovies(@RequestParam String field, @RequestParam String order) {
+        Sort sortOrder = "asc".equalsIgnoreCase(order)
+                ? Sort.by(Sort.Direction.ASC, field)
+                : Sort.by(Sort.Direction.DESC, field);
+        return movieRepository.findAll(sortOrder);
+    }
+
+    @GetMapping("/movies/filter")
+    public List<Movie> filterMovies(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) List<String> categories,
+            @RequestParam(required = false) Integer rating) {
+        if (search != null && !search.isEmpty()) {
+            if (categories != null && !categories.isEmpty()) {
+                if (rating != null) {
+                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryInAndRatingGreaterThanEqual(search, categories, rating);
+                } else {
+                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryIn(search, categories);
+                }
+            } else {
+                if (rating != null) {
+                    return movieRepository.findByTitleContainingIgnoreCaseAndRatingGreaterThanEqual(search, rating);
+                } else {
+                    return movieRepository.findByTitleContainingIgnoreCase(search);
+                }
+            }
+        } else {
+            if (categories != null && !categories.isEmpty()) {
+                if (rating != null) {
+                    return movieRepository.findByCategoryInAndRatingGreaterThanEqual(categories, rating);
+                } else {
+                    return movieRepository.findByCategoryIn(categories);
+                }
+            } else {
+                if (rating != null) {
+                    return movieRepository.findByRatingGreaterThanEqual(rating);
+                } else {
+                    return movieRepository.findAll();
+                }
+            }
+        }
     }
 }

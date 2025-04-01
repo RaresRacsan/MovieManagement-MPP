@@ -16,5 +16,18 @@ public interface MovieRepository extends JpaRepository<Movie, Integer> {
     List<Movie> findByCategoryIn(List<String> categories, Sort sort);
     List<Movie> findByCategoryInAndRatingGreaterThanEqual(List<String> categories, Integer rating, Sort sort);
     List<Movie> findByRatingGreaterThanEqual(Integer rating, Sort sort);
+    List<Movie> findByTitleContainingIgnoreCase(String title);
+
+    List<Movie> findByTitleContainingIgnoreCaseAndCategoryIn(String title, List<String> categories);
+
+    List<Movie> findByTitleContainingIgnoreCaseAndRatingGreaterThanEqual(String title, Integer rating);
+
+    List<Movie> findByTitleContainingIgnoreCaseAndCategoryInAndRatingGreaterThanEqual(String title, List<String> categories, Integer rating);
+
+    List<Movie> findByCategoryIn(List<String> categories);
+
+    List<Movie> findByCategoryInAndRatingGreaterThanEqual(List<String> categories, Integer rating);
+
+    List<Movie> findByRatingGreaterThanEqual(Integer rating);
 
 }
