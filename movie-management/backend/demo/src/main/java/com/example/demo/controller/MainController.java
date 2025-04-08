@@ -31,66 +31,11 @@ public class MainController {
     @GetMapping("/main")
     @CrossOrigin(origins = "http://localhost:3000")
     public Page<Movie> getAllMovies(
-            @RequestParam(required = false) String sort,
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false) List<String> categories,
-            @RequestParam(required = false) Integer rating,
-            @RequestParam(required = false) String alphabetical,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        Sort sortOrder = Sort.unsorted();
-
-        // Handle sorting by rating
-        if ("asc".equals(sort)) {
-            sortOrder = Sort.by(Sort.Direction.ASC, "rating");
-        } else if ("desc".equals(sort)) {
-            sortOrder = Sort.by(Sort.Direction.DESC, "rating");
-        }
-
-        // Handle alphabetical sorting
-        if ("asc".equals(alphabetical)) {
-            sortOrder = Sort.by(Sort.Direction.ASC, "title");
-        } else if ("desc".equals(alphabetical)) {
-            sortOrder = Sort.by(Sort.Direction.DESC, "title");
-        }
-
-        Pageable pageable = PageRequest.of(page, size, sortOrder);
-
-        // Handle filtering with pagination
-        if (search != null && !search.isEmpty()) {
-            if (categories != null && !categories.isEmpty()) {
-                if (rating != null) {
-                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryInAndRatingGreaterThanEqual(
-                            search, categories, rating, pageable);
-                } else {
-                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryIn(
-                            search, categories, pageable);
-                }
-            } else {
-                if (rating != null) {
-                    return movieRepository.findByTitleContainingIgnoreCaseAndRatingGreaterThanEqual(
-                            search, rating, pageable);
-                } else {
-                    return movieRepository.findByTitleContainingIgnoreCase(search, pageable);
-                }
-            }
-        } else {
-            if (categories != null && !categories.isEmpty()) {
-                if (rating != null) {
-                    return movieRepository.findByCategoryInAndRatingGreaterThanEqual(
-                            categories, rating, pageable);
-                } else {
-                    return movieRepository.findByCategoryIn(categories, pageable);
-                }
-            } else {
-                if (rating != null) {
-                    return movieRepository.findByRatingGreaterThanEqual(rating, pageable);
-                } else {
-                    return movieRepository.findAll(pageable);
-                }
-            }
-        }
+        Pageable pageable = PageRequest.of(page, size);
+        return movieRepository.findAll(pageable);
     }
 
     public List<Movie> getAllMovies() {
@@ -154,44 +99,61 @@ public class MainController {
     }
 
     @GetMapping("/movies/sort")
-    public List<Movie> sortMovies(@RequestParam String field, @RequestParam String order) {
-        Sort sortOrder = "asc".equalsIgnoreCase(order)
-                ? Sort.by(Sort.Direction.ASC, field)
-                : Sort.by(Sort.Direction.DESC, field);
-        return movieRepository.findAll(sortOrder);
+    @CrossOrigin(origins = "http://localhost:3000")
+    public Page<Movie> sortMovies(
+            @RequestParam String field,
+            @RequestParam String order,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Sort.Direction direction = "asc".equalsIgnoreCase(order) ?
+                Sort.Direction.ASC : Sort.Direction.DESC;
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, field));
+        return movieRepository.findAll(pageable);
     }
 
     @GetMapping("/movies/filter")
-    public List<Movie> filterMovies(
+    @CrossOrigin(origins = "http://localhost:3000")
+    public Page<Movie> filterMovies(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) List<String> categories,
-            @RequestParam(required = false) Integer rating) {
+            @RequestParam(required = false) Integer rating,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Pageable pageable = PageRequest.of(page, size);
+
         if (search != null && !search.isEmpty()) {
             if (categories != null && !categories.isEmpty()) {
                 if (rating != null) {
-                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryInAndRatingGreaterThanEqual(search, categories, rating);
+                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryInAndRatingGreaterThanEqual(
+                            search, categories, rating, pageable);
                 } else {
-                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryIn(search, categories);
+                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryIn(
+                            search, categories, pageable);
                 }
             } else {
                 if (rating != null) {
-                    return movieRepository.findByTitleContainingIgnoreCaseAndRatingGreaterThanEqual(search, rating);
+                    return movieRepository.findByTitleContainingIgnoreCaseAndRatingGreaterThanEqual(
+                            search, rating, pageable);
                 } else {
-                    return movieRepository.findByTitleContainingIgnoreCase(search);
+                    return movieRepository.findByTitleContainingIgnoreCase(search, pageable);
                 }
             }
         } else {
             if (categories != null && !categories.isEmpty()) {
                 if (rating != null) {
-                    return movieRepository.findByCategoryInAndRatingGreaterThanEqual(categories, rating);
+                    return movieRepository.findByCategoryInAndRatingGreaterThanEqual(
+                            categories, rating, pageable);
                 } else {
-                    return movieRepository.findByCategoryIn(categories);
+                    return movieRepository.findByCategoryIn(categories, pageable);
                 }
             } else {
                 if (rating != null) {
-                    return movieRepository.findByRatingGreaterThanEqual(rating);
+                    return movieRepository.findByRatingGreaterThanEqual(rating, pageable);
                 } else {
-                    return movieRepository.findAll();
+                    return movieRepository.findAll(pageable);
                 }
             }
         }

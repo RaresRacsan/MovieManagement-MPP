@@ -26,7 +26,7 @@ interface PendingOperation {
 
 function MovieList() {
   const [movies, setMovies] = useState<Movie[]>([]);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -221,45 +221,66 @@ function MovieList() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isLoading, hasMore, movies.length]);
 
-  const loadMoreMovies = () => {
-    if (isOnline && isServerAvailable && hasMore && !isLoading) {
-      const nextPage = currentPage + 1;
-      setIsLoading(true);
-      setCurrentPage(nextPage);
+  // Modify the loadMoreMovies function to fix the prevMovies scope issue
+
+const loadMoreMovies = () => {
+  if (isOnline && isServerAvailable && hasMore && !isLoading) {
+    const nextPage = currentPage + 1;
+    setIsLoading(true);
+    setCurrentPage(nextPage);
+    
+    // Determine which API to call based on parameters
+    let url;
+    
+    // Case 1: Filtering is required
+    if (searchQuery || selectedCategories.length > 0 || selectedRating !== null) {
+      url = `http://localhost:8080/api/movies/filter?page=${nextPage}&size=${moviesPerPage}`;
       
-      let url = `http://localhost:8080/api/main?page=${nextPage}&size=${moviesPerPage}`;
+      if (searchQuery) {
+        url += `&search=${encodeURIComponent(searchQuery)}`;
+      }
       
-      // Add other parameters
-      if (sortOrder) {
-        url += `&sort=${sortOrder}`;
-      }
-      if (alphabeticalOrder) {
-        url += `&alphabetical=${alphabeticalOrder}`;
-      }
       if (selectedCategories.length > 0) {
         url += `&categories=${selectedCategories.join(",")}`;
       }
+      
       if (selectedRating !== null) {
         url += `&rating=${selectedRating}`;
       }
-      if (searchQuery) {
-        url += `&search=${searchQuery}`;
-      }
-      
-      fetch(url)
-        .then(response => response.json())
-        .then(data => {
-          setMovies(prevMovies => [...prevMovies, ...data.content]);
-          setHasMore(data.content.length > 0 && !data.last);
-          setTotalMovies(data.totalElements);
-          setIsLoading(false);
-        })
-        .catch(error => {
-          console.error("Error loading more movies:", error);
-          setIsLoading(false);
-        });
     }
-  };
+    // Case 2: Sorting is required
+    else if (sortOrder || alphabeticalOrder) {
+      url = `http://localhost:8080/api/movies/sort?page=${nextPage}&size=${moviesPerPage}`;
+      
+      // Determine which field to sort by
+      const field = sortOrder ? "rating" : "title";
+      const sortValue = sortOrder || alphabeticalOrder;
+      
+      url += `&field=${field}&order=${sortValue}`;
+    }
+    // Case 3: No sorting or filtering, just get all movies
+    else {
+      url = `http://localhost:8080/api/main?page=${nextPage}&size=${moviesPerPage}`;
+    }
+    
+    fetch(url)
+      .then(response => response.json())
+      .then(data => {
+        // Move all this logic inside the setMovies callback to access prevMovies
+        setMovies(prevMovies => {
+          const newMovies = [...prevMovies, ...(data.content || data)];
+          setHasMore(data.content ? (!data.last) : (data.length === moviesPerPage));
+          setTotalMovies(data.totalElements || newMovies.length);
+          return newMovies;
+        });
+        setIsLoading(false);
+      })
+      .catch(error => {
+        console.error("Error loading more movies:", error);
+        setIsLoading(false);
+      });
+  }
+};
 
   const fetchAllMovies = () => {
     if (isOnline && isServerAvailable) {
@@ -337,23 +358,38 @@ function MovieList() {
       setCurrentPage(1);
     }
     
-    // Use pagination for API requests
-    let url = `http://localhost:8080/api/main?page=${resetPage ? 1 : currentPage}&size=${moviesPerPage}`;
+    // Determine which API to call based on parameters
+    let url;
     
-    if (query) {
-      url += `&search=${query}`;
+    // Case 1: Filtering is required
+    if (query || selectedCategories.length > 0 || selectedRating !== null) {
+      url = `http://localhost:8080/api/movies/filter?page=${resetPage ? 1 : currentPage}&size=${moviesPerPage}`;
+      
+      if (query) {
+        url += `&search=${encodeURIComponent(query)}`;
+      }
+      
+      if (selectedCategories.length > 0) {
+        url += `&categories=${selectedCategories.join(",")}`;
+      }
+      
+      if (selectedRating !== null) {
+        url += `&rating=${selectedRating}`;
+      }
     }
-    if (order) {
-      url += `&sort=${order}`;
+    // Case 2: Sorting is required
+    else if (order || alphabeticalOrder) {
+      url = `http://localhost:8080/api/movies/sort?page=${resetPage ? 1 : currentPage}&size=${moviesPerPage}`;
+      
+      // Determine which field to sort by
+      const field = order ? "rating" : "title";
+      const sortValue = order || alphabeticalOrder;
+      
+      url += `&field=${field}&order=${sortValue}`;
     }
-    if (alphabeticalOrder) {
-      url += `&alphabetical=${alphabeticalOrder}`;
-    }
-    if (selectedCategories.length > 0) {
-      url += `&categories=${selectedCategories.join(",")}`;
-    }
-    if (selectedRating !== null) {
-      url += `&rating=${selectedRating}`;
+    // Case 3: No sorting or filtering, just get all movies
+    else {
+      url = `http://localhost:8080/api/main?page=${resetPage ? 1 : currentPage}&size=${moviesPerPage}`;
     }
     
     setIsLoading(true);
@@ -453,18 +489,18 @@ function MovieList() {
       });
   };
 
-  // Rest of your component remains the same...
   const toggleSortOrder = () => {
     const newOrder = sortOrder === "asc" ? "desc" : "asc";
     setSortOrder(newOrder);
-    setAlphabeticalOrder(null);
+    setAlphabeticalOrder(null); // Reset alphabetical sort when sorting by rating
     // Reset to page 1 when changing sort order
     fetchMovies(searchQuery, newOrder, null, true);
   };
-
+  
   const toggleAlphabeticalOrder = () => {
     const newOrder = alphabeticalOrder === "asc" ? "desc" : "asc";
     setAlphabeticalOrder(newOrder);
+    setSortOrder(null); // Reset rating sort when sorting alphabetically
     fetchMovies(searchQuery, null, newOrder, true);
   };
 
@@ -640,11 +676,7 @@ function MovieList() {
   );
 }
 
-// You also need to modify your AddMovie and UpdateMovie components to support offline operations
-// Here's a helper function you can use to add to those components:
-
-// Update the performOperationWithOfflineSupport function to fix the typing issue
-
+// Helper function for offline operations
 export const performOperationWithOfflineSupport = async (
   operation: 'add' | 'update' | 'delete',
   url: string,
@@ -677,7 +709,7 @@ export const performOperationWithOfflineSupport = async (
   
   // If we get here, either network is down or server is down
   if (movieData) {
-    const pendingOpsStr = localStorage.getItem('pending_movie_operations');
+    const pendingOpsStr = localStorage.getItem(PENDING_OPERATIONS_KEY);
     const pendingOps = pendingOpsStr ? JSON.parse(pendingOpsStr) : [];
     
     pendingOps.push({
@@ -687,11 +719,11 @@ export const performOperationWithOfflineSupport = async (
       timestamp: Date.now()
     });
     
-    localStorage.setItem('pending_movie_operations', JSON.stringify(pendingOps));
+    localStorage.setItem(PENDING_OPERATIONS_KEY, JSON.stringify(pendingOps));
     
     // Update cache for immediate UI changes
     if (operation === 'add' || operation === 'update') {
-      const cachedMoviesStr = localStorage.getItem('cached_movies');
+      const cachedMoviesStr = localStorage.getItem(CACHED_MOVIES_KEY);
       const cachedMovies: Movie[] = cachedMoviesStr ? JSON.parse(cachedMoviesStr) : [];
       
       if (operation === 'add') {
@@ -705,7 +737,7 @@ export const performOperationWithOfflineSupport = async (
         }
       }
       
-      localStorage.setItem('cached_movies', JSON.stringify(cachedMovies));
+      localStorage.setItem(CACHED_MOVIES_KEY, JSON.stringify(cachedMovies));
     }
   }
   
