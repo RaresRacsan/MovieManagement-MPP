@@ -303,3 +303,49 @@
   margin: 0 10px;
   font-size: 16px;
 }
+
+/* Add to your App.css file */
+.network-status {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: none;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
+.network-status.visible {
+  display: block;
+  opacity: 1;
+}
+
+.offline-indicator {
+  background-color: #f44336;
+  color: white;
+  text-align: center;
+  padding: 10px;
+  font-weight: bold;
+}
+
+.server-down-indicator {
+  background-color: #ff9800;
+  color: white;
+  text-align: center;
+  padding: 10px;
+  font-weight: bold;
+}
+
+.loading-indicator {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+.end-message {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-style: italic;
+}

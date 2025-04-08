@@ -2,8 +2,10 @@ package com.example.demo.controller;
 
 import com.example.demo.model.Movie;
 import com.example.demo.repository.MovieRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,14 +22,23 @@ public class MainController {
         this.movieRepository = movieRepository;
     }
 
+    @GetMapping("/health")
+    @CrossOrigin(origins = "*", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.HEAD, RequestMethod.OPTIONS})
+    public ResponseEntity<Void> healthCheck() {
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/main")
     @CrossOrigin(origins = "http://localhost:3000")
-    public List<Movie> getAllMovies(
+    public Page<Movie> getAllMovies(
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) List<String> categories,
             @RequestParam(required = false) Integer rating,
-            @RequestParam(required = false) String alphabetical) {
+            @RequestParam(required = false) String alphabetical,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
         Sort sortOrder = Sort.unsorted();
 
         // Handle sorting by rating
@@ -44,33 +55,39 @@ public class MainController {
             sortOrder = Sort.by(Sort.Direction.DESC, "title");
         }
 
-        // Handle filtering
+        Pageable pageable = PageRequest.of(page, size, sortOrder);
+
+        // Handle filtering with pagination
         if (search != null && !search.isEmpty()) {
             if (categories != null && !categories.isEmpty()) {
                 if (rating != null) {
-                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryInAndRatingGreaterThanEqual(search, categories, rating, sortOrder);
+                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryInAndRatingGreaterThanEqual(
+                            search, categories, rating, pageable);
                 } else {
-                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryIn(search, categories, sortOrder);
+                    return movieRepository.findByTitleContainingIgnoreCaseAndCategoryIn(
+                            search, categories, pageable);
                 }
             } else {
                 if (rating != null) {
-                    return movieRepository.findByTitleContainingIgnoreCaseAndRatingGreaterThanEqual(search, rating, sortOrder);
+                    return movieRepository.findByTitleContainingIgnoreCaseAndRatingGreaterThanEqual(
+                            search, rating, pageable);
                 } else {
-                    return movieRepository.findByTitleContainingIgnoreCase(search, sortOrder);
+                    return movieRepository.findByTitleContainingIgnoreCase(search, pageable);
                 }
             }
         } else {
             if (categories != null && !categories.isEmpty()) {
                 if (rating != null) {
-                    return movieRepository.findByCategoryInAndRatingGreaterThanEqual(categories, rating, sortOrder);
+                    return movieRepository.findByCategoryInAndRatingGreaterThanEqual(
+                            categories, rating, pageable);
                 } else {
-                    return movieRepository.findByCategoryIn(categories, sortOrder);
+                    return movieRepository.findByCategoryIn(categories, pageable);
                 }
             } else {
                 if (rating != null) {
-                    return movieRepository.findByRatingGreaterThanEqual(rating, sortOrder);
+                    return movieRepository.findByRatingGreaterThanEqual(rating, pageable);
                 } else {
-                    return movieRepository.findAll(sortOrder);
+                    return movieRepository.findAll(pageable);
                 }
             }
         }

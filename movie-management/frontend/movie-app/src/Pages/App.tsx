@@ -5,12 +5,23 @@ import AddMovie from "./AddMovies";
 import UpdateMovie from "./UpdateMovies";
 import Charts from "./Charts";
 
+// Define keys for local storage
+const PENDING_OPERATIONS_KEY = 'pending_movie_operations';
+const CACHED_MOVIES_KEY = 'cached_movies';
+
 interface Movie {
   id: number;
   title: string;
   rating: number;
   description: string;
   category: string;
+}
+
+interface PendingOperation {
+  type: 'add' | 'update' | 'delete';
+  movie: Movie;
+  id?: number; // For delete and update operations
+  timestamp: number;
 }
 
 function MovieList() {
@@ -21,47 +32,319 @@ function MovieList() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
-  const [alphabeticalOrder, setAlphabeticalOrder] = useState<
-    "asc" | "desc" | null
-  >(null);
-
+  const [alphabeticalOrder, setAlphabeticalOrder] = useState<"asc" | "desc" | null>(null);
+  
   const [currentPage, setCurrentPage] = useState(1);
-  const moviesPerPage = 3;
+  const moviesPerPage = 10; // Increased for endless scrolling
+  
+  // New state for network status
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [isServerAvailable, setIsServerAvailable] = useState<boolean>(true);
+  
+  // State to track if we're loading more movies for infinite scroll
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [totalMovies, setTotalMovies] = useState<number>(0);
 
+  // Track online/offline status
   useEffect(() => {
-    fetchAllMovies();
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncPendingOperations();
+    };
+    
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    // Check server availability every 30 seconds
+    const checkServerInterval = setInterval(() => {
+      if (navigator.onLine) {
+        checkServerAvailability();
+      }
+    }, 30000);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    // Initial check
+    checkServerAvailability();
+    
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      clearInterval(checkServerInterval);
+    };
   }, []);
 
+  // Function to check if server is available
+  const checkServerAvailability = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/health', { 
+        method: 'HEAD',
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+        }
+      });
+      setIsServerAvailable(response.ok);
+      if (response.ok && !isServerAvailable) {
+        // Server is back online - sync pending operations
+        syncPendingOperations();
+      }
+    } catch (error) {
+      console.error("Server check failed:", error);
+      setIsServerAvailable(false);
+    }
+  };
+
+  // Function to get movies from local cache
+  const getMoviesFromCache = () => {
+    const cachedMoviesStr = localStorage.getItem(CACHED_MOVIES_KEY);
+    if (cachedMoviesStr) {
+      return JSON.parse(cachedMoviesStr) as Movie[];
+    }
+    return [];
+  };
+
+  // Function to save movies to local cache
+  const saveMoviesToCache = (moviesData: Movie[]) => {
+    localStorage.setItem(CACHED_MOVIES_KEY, JSON.stringify(moviesData));
+  };
+
+  // Function to get pending operations
+  const getPendingOperations = (): PendingOperation[] => {
+    const pendingOpsStr = localStorage.getItem(PENDING_OPERATIONS_KEY);
+    if (pendingOpsStr) {
+      return JSON.parse(pendingOpsStr);
+    }
+    return [];
+  };
+
+  // Function to save pending operations
+  const savePendingOperation = (operation: PendingOperation) => {
+    const pendingOps = getPendingOperations();
+    pendingOps.push(operation);
+    localStorage.setItem(PENDING_OPERATIONS_KEY, JSON.stringify(pendingOps));
+  };
+
+  // Function to remove a pending operation
+  const removePendingOperation = (index: number) => {
+    const pendingOps = getPendingOperations();
+    pendingOps.splice(index, 1);
+    localStorage.setItem(PENDING_OPERATIONS_KEY, JSON.stringify(pendingOps));
+  };
+
+  // Function to sync pending operations with server
+  const syncPendingOperations = async () => {
+    if (!isOnline || !isServerAvailable) return;
+    
+    const pendingOps = getPendingOperations();
+    
+    for (let i = 0; i < pendingOps.length; i++) {
+      const op = pendingOps[i];
+      let success = false;
+      
+      try {
+        switch(op.type) {
+          case 'add':
+            const addResponse = await fetch('http://localhost:8080/api/add', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(op.movie)
+            });
+            success = addResponse.ok;
+            break;
+            
+          case 'update':
+            const updateResponse = await fetch(`http://localhost:8080/api/update/${op.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(op.movie)
+            });
+            success = updateResponse.ok;
+            break;
+            
+          case 'delete':
+            const deleteResponse = await fetch(`http://localhost:8080/api/delete/${op.id}`, {
+              method: 'DELETE'
+            });
+            success = deleteResponse.ok;
+            break;
+        }
+        
+        if (success) {
+          removePendingOperation(i);
+          i--; // Adjust index after removal
+        }
+      } catch (error) {
+        console.error(`Error syncing operation: ${op.type}`, error);
+      }
+    }
+    
+    // Refresh movies after syncing
+    fetchMovies(searchQuery, sortOrder, alphabeticalOrder, true);
+  };
+
   useEffect(() => {
-    fetchMovies(searchQuery, sortOrder, alphabeticalOrder);
-  }, [
-    searchQuery,
-    sortOrder,
-    alphabeticalOrder,
-    selectedCategories,
-    selectedRating,
-  ]);
+    if (isOnline && isServerAvailable) {
+      fetchMovies(searchQuery, sortOrder, alphabeticalOrder, true);
+    } else {
+      // Load from cache if offline
+      const cachedMovies = getMoviesFromCache();
+      if (cachedMovies.length > 0) {
+        setMovies(cachedMovies);
+      }
+    }
+  }, [isOnline, isServerAvailable]);
+
+  useEffect(() => {
+    // Only fetch if we're online and server is available
+    if (isOnline && isServerAvailable) {
+      fetchMovies(searchQuery, sortOrder, alphabeticalOrder);
+    }
+  }, [searchQuery, sortOrder, alphabeticalOrder, selectedCategories, selectedRating]);
+  
+  // Setup infinite scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollHeight = document.documentElement.scrollHeight;
+      const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+      const clientHeight = document.documentElement.clientHeight;
+      
+      if (!isLoading && hasMore && (scrollHeight - scrollTop <= clientHeight + 100)) {
+        loadMoreMovies();
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isLoading, hasMore, movies.length]);
+
+  const loadMoreMovies = () => {
+    if (isOnline && isServerAvailable && hasMore && !isLoading) {
+      const nextPage = currentPage + 1;
+      setIsLoading(true);
+      setCurrentPage(nextPage);
+      
+      let url = `http://localhost:8080/api/main?page=${nextPage}&size=${moviesPerPage}`;
+      
+      // Add other parameters
+      if (sortOrder) {
+        url += `&sort=${sortOrder}`;
+      }
+      if (alphabeticalOrder) {
+        url += `&alphabetical=${alphabeticalOrder}`;
+      }
+      if (selectedCategories.length > 0) {
+        url += `&categories=${selectedCategories.join(",")}`;
+      }
+      if (selectedRating !== null) {
+        url += `&rating=${selectedRating}`;
+      }
+      if (searchQuery) {
+        url += `&search=${searchQuery}`;
+      }
+      
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          setMovies(prevMovies => [...prevMovies, ...data.content]);
+          setHasMore(data.content.length > 0 && !data.last);
+          setTotalMovies(data.totalElements);
+          setIsLoading(false);
+        })
+        .catch(error => {
+          console.error("Error loading more movies:", error);
+          setIsLoading(false);
+        });
+    }
+  };
 
   const fetchAllMovies = () => {
-    fetch(`http://localhost:8080/api/main`)
-      .then((response) => response.json())
-      .then((data: Movie[]) => {
+    if (isOnline && isServerAvailable) {
+      fetch(`http://localhost:8080/api/main`)
+        .then((response) => response.json())
+        .then((data: Movie[]) => {
+          const uniqueCategories = Array.from(
+            new Set(data.map((movie: Movie) => movie.category))
+          );
+          setCategories(uniqueCategories);
+        })
+        .catch((error) => {
+          console.error("Error fetching data:", error);
+          setIsServerAvailable(false);
+        });
+    } else {
+      // If offline, try to get categories from cached movies
+      const cachedMovies = getMoviesFromCache();
+      if (cachedMovies.length > 0) {
         const uniqueCategories = Array.from(
-          new Set(data.map((movie: Movie) => movie.category))
+          new Set(cachedMovies.map((movie: Movie) => movie.category))
         );
         setCategories(uniqueCategories);
-      })
-      .catch((error) => console.error("Error fetching data:", error));
+      }
+    }
   };
 
   const fetchMovies = (
     query: string,
     order: "asc" | "desc" | null = null,
-    alphabeticalOrder: "asc" | "desc" | null = null
+    alphabeticalOrder: "asc" | "desc" | null = null,
+    resetPage: boolean = false
   ) => {
-    let url = `http://localhost:8080/api/main?search=${query}`;
-    if (sortOrder) {
-      url += `&sort=${sortOrder}`;
+    if (!isOnline || !isServerAvailable) {
+      // Use cached data for offline mode
+      let cachedMovies = getMoviesFromCache();
+      
+      // Apply filtering and sorting locally
+      if (query) {
+        cachedMovies = cachedMovies.filter(movie => 
+          movie.title.toLowerCase().includes(query.toLowerCase())
+        );
+      }
+      
+      if (selectedCategories.length > 0) {
+        cachedMovies = cachedMovies.filter(movie => 
+          selectedCategories.includes(movie.category)
+        );
+      }
+      
+      if (selectedRating !== null) {
+        cachedMovies = cachedMovies.filter(movie => 
+          movie.rating >= selectedRating
+        );
+      }
+      
+      if (order) {
+        cachedMovies.sort((a, b) => {
+          return order === 'asc' ? a.rating - b.rating : b.rating - a.rating;
+        });
+      } else if (alphabeticalOrder) {
+        cachedMovies.sort((a, b) => {
+          return alphabeticalOrder === 'asc' 
+            ? a.title.localeCompare(b.title)
+            : b.title.localeCompare(a.title);
+        });
+      }
+      
+      setMovies(cachedMovies);
+      return;
+    }
+    
+    // If we're resetting the page, start from page 1
+    if (resetPage) {
+      setCurrentPage(1);
+    }
+    
+    // Use pagination for API requests
+    let url = `http://localhost:8080/api/main?page=${resetPage ? 1 : currentPage}&size=${moviesPerPage}`;
+    
+    if (query) {
+      url += `&search=${query}`;
+    }
+    if (order) {
+      url += `&sort=${order}`;
     }
     if (alphabeticalOrder) {
       url += `&alphabetical=${alphabeticalOrder}`;
@@ -72,33 +355,117 @@ function MovieList() {
     if (selectedRating !== null) {
       url += `&rating=${selectedRating}`;
     }
+    
+    setIsLoading(true);
+    
     fetch(url)
-      .then((response) => response.json())
-      .then((data: Movie[]) => setMovies(data))
-      .catch((error) => console.error("Error fetching data:", error));
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        // Check if we're getting paginated response
+        if (data.content) {
+          if (resetPage) {
+            setMovies(data.content);
+          } else {
+            setMovies(prevMovies => currentPage === 1 ? data.content : [...prevMovies, ...data.content]);
+          }
+          setHasMore(!data.last);
+          setTotalMovies(data.totalElements);
+        } else {
+          // Handle non-paginated response
+          if (resetPage) {
+            setMovies(data);
+          } else {
+            setMovies(prevMovies => currentPage === 1 ? data : [...prevMovies, ...data]);
+          }
+          setHasMore(data.length === moviesPerPage);
+        }
+        
+        // Cache the complete set of movies for offline use
+        saveMoviesToCache(data.content || data);
+        setIsLoading(false);
+        setIsServerAvailable(true);
+      })
+      .catch((error) => {
+        console.error("Error fetching data:", error);
+        setIsServerAvailable(false);
+        setIsLoading(false);
+        
+        // Use cached data as fallback
+        const cachedMovies = getMoviesFromCache();
+        if (cachedMovies.length > 0) {
+          setMovies(cachedMovies);
+        }
+      });
   };
 
   const handleDelete = (id: number) => {
+    if (!isOnline || !isServerAvailable) {
+      // Store operation for later sync
+      const movieToDelete = movies.find(movie => movie.id === id);
+      if (movieToDelete) {
+        savePendingOperation({
+          type: 'delete',
+          movie: movieToDelete,
+          id: id,
+          timestamp: Date.now()
+        });
+      }
+      // Update UI immediately
+      setMovies(movies.filter((movie) => movie.id !== id));
+      return;
+    }
+    
     fetch(`http://localhost:8080/api/delete/${id}`, {
       method: "DELETE",
     })
-      .then(() => {
-        setMovies(movies.filter((movie) => movie.id !== id));
+      .then((response) => {
+        if (response.ok) {
+          setMovies(movies.filter((movie) => movie.id !== id));
+          
+          // Update cache
+          const cachedMovies = getMoviesFromCache();
+          saveMoviesToCache(cachedMovies.filter(movie => movie.id !== id));
+        } else {
+          throw new Error("Failed to delete movie");
+        }
       })
-      .catch((error) => console.error("Error deleting movie:", error));
+      .catch((error) => {
+        console.error("Error deleting movie:", error);
+        setIsServerAvailable(false);
+        
+        // Store operation for later sync
+        const movieToDelete = movies.find(movie => movie.id === id);
+        if (movieToDelete) {
+          savePendingOperation({
+            type: 'delete',
+            movie: movieToDelete,
+            id: id,
+            timestamp: Date.now()
+          });
+        }
+        // Update UI immediately
+        setMovies(movies.filter((movie) => movie.id !== id));
+      });
   };
 
+  // Rest of your component remains the same...
   const toggleSortOrder = () => {
     const newOrder = sortOrder === "asc" ? "desc" : "asc";
     setSortOrder(newOrder);
     setAlphabeticalOrder(null);
-    fetchMovies(searchQuery, newOrder, null);
+    // Reset to page 1 when changing sort order
+    fetchMovies(searchQuery, newOrder, null, true);
   };
 
   const toggleAlphabeticalOrder = () => {
     const newOrder = alphabeticalOrder === "asc" ? "desc" : "asc";
     setAlphabeticalOrder(newOrder);
-    fetchMovies(searchQuery, null, newOrder);
+    fetchMovies(searchQuery, null, newOrder, true);
   };
 
   const toggleFilterMenu = () => {
@@ -111,19 +478,24 @@ function MovieList() {
         ? prevCategories.filter((cat) => cat !== category)
         : [...prevCategories, category]
     );
+    // Reset to page 1
+    setCurrentPage(1);
   };
 
   const handleRatingChange = (rating: number) => {
     setSelectedRating(rating);
+    // Reset to page 1
+    setCurrentPage(1);
   };
 
   const resetFilters = () => {
     setSelectedCategories([]);
     setSelectedRating(null);
-    fetchMovies(searchQuery, sortOrder, alphabeticalOrder);
+    fetchMovies("", sortOrder, alphabeticalOrder, true);
   };
 
   const getRatingClass = (rating: number) => {
+    // Your existing implementation
     const ratings = movies.map((movie) => movie.rating);
     const maxRating = Math.max(...ratings);
     const minRating = Math.min(...ratings);
@@ -137,12 +509,14 @@ function MovieList() {
     return "";
   };
 
-  const indexOfLastMovie = currentPage * moviesPerPage;
-  const indexOfFirstMovie = indexOfLastMovie - moviesPerPage;
-  const currentMovies = movies.slice(indexOfFirstMovie, indexOfLastMovie);
-
   return (
     <div className="container">
+      {/* Network Status Indicator */}
+      <div className={`network-status ${!isOnline || !isServerAvailable ? 'visible' : ''}`}>
+        {!isOnline && <div className="offline-indicator">You are offline. Changes will be saved locally.</div>}
+        {isOnline && !isServerAvailable && <div className="server-down-indicator">Server is unavailable. Using cached data.</div>}
+      </div>
+
       <div className="image-container">
         <img src="/cinema.jpg" alt="Cinema" className="cinema-image" />
         <div className="image-text">Welcome to My Movie Management App</div>
@@ -159,7 +533,10 @@ function MovieList() {
           type="text"
           placeholder="Search by title"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setCurrentPage(1); // Reset to page 1 when searching
+          }}
           className="search-input"
         />
         <button onClick={toggleFilterMenu} className="filter-btn">
@@ -208,12 +585,11 @@ function MovieList() {
       )}
 
       <div className="movie-list">
-        {currentMovies.map((movie, index) => (
-          <div key={movie.id} className="movie-item">
+        {movies.map((movie, index) => (
+          <div key={movie.id || `temp-${index}`} className="movie-item">
             <div
               className={`movie-number ${index % 2 === 0 ? "green" : "blue"}`}
             >
-              {" "}
               {index + 1}.
             </div>
             <div className={`movie-details ${getRatingClass(movie.rating)}`}>
@@ -241,30 +617,18 @@ function MovieList() {
             </div>
           </div>
         ))}
-      </div>
-
-      <div className="pagination">
-        <button
-          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-          disabled={currentPage === 1}
-          className="page-btn"
-        >
-          ◀ Prev
-        </button>
-        <span>
-          Page {currentPage} of {Math.ceil(movies.length / moviesPerPage)}
-        </span>
-        <button
-          onClick={() =>
-            setCurrentPage((prev) =>
-              Math.min(prev + 1, Math.ceil(movies.length / moviesPerPage))
-            )
-          }
-          disabled={currentPage === Math.ceil(movies.length / moviesPerPage)}
-          className="page-btn"
-        >
-          Next ▶
-        </button>
+        
+        {isLoading && (
+          <div className="loading-indicator">
+            <p>Loading more movies...</p>
+          </div>
+        )}
+        
+        {!hasMore && movies.length > 0 && (
+          <div className="end-message">
+            <p>You've reached the end!</p>
+          </div>
+        )}
       </div>
 
       <Link to="/add" className="add-btn">
@@ -275,6 +639,78 @@ function MovieList() {
     </div>
   );
 }
+
+// You also need to modify your AddMovie and UpdateMovie components to support offline operations
+// Here's a helper function you can use to add to those components:
+
+// Update the performOperationWithOfflineSupport function to fix the typing issue
+
+export const performOperationWithOfflineSupport = async (
+  operation: 'add' | 'update' | 'delete',
+  url: string,
+  method: string,
+  movieData?: Movie,
+  id?: number
+) => {
+  const isOnline = navigator.onLine;
+  
+  // Try server first if online
+  if (isOnline) {
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: movieData ? JSON.stringify(movieData) : undefined,
+      });
+      
+      if (response.ok) {
+        return { success: true, offline: false };
+      }
+      throw new Error('Server error');
+    } catch (error) {
+      console.error('Server operation failed:', error);
+      // Server is down but network is up - fall back to offline mode
+    }
+  }
+  
+  // If we get here, either network is down or server is down
+  if (movieData) {
+    const pendingOpsStr = localStorage.getItem('pending_movie_operations');
+    const pendingOps = pendingOpsStr ? JSON.parse(pendingOpsStr) : [];
+    
+    pendingOps.push({
+      type: operation,
+      movie: movieData,
+      id: id,
+      timestamp: Date.now()
+    });
+    
+    localStorage.setItem('pending_movie_operations', JSON.stringify(pendingOps));
+    
+    // Update cache for immediate UI changes
+    if (operation === 'add' || operation === 'update') {
+      const cachedMoviesStr = localStorage.getItem('cached_movies');
+      const cachedMovies: Movie[] = cachedMoviesStr ? JSON.parse(cachedMoviesStr) : [];
+      
+      if (operation === 'add') {
+        // Generate temporary ID for new movie
+        const tempMovie = { ...movieData, id: -Date.now() }; // Negative ID to avoid conflicts with real IDs
+        cachedMovies.push(tempMovie);
+      } else if (operation === 'update' && id) {
+        const index = cachedMovies.findIndex((movie: Movie) => movie.id === id);
+        if (index !== -1) {
+          cachedMovies[index] = { ...movieData, id };
+        }
+      }
+      
+      localStorage.setItem('cached_movies', JSON.stringify(cachedMovies));
+    }
+  }
+  
+  return { success: true, offline: true };
+};
 
 function App() {
   return (
