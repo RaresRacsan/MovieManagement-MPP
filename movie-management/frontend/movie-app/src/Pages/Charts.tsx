@@ -18,7 +18,41 @@ const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 function Charts({ movies }: Props) {
   const [ratingsData, setRatingsData] = useState<{ rating: string; count: number }[]>([]);
   const [categoryData, setCategoryData] = useState<{ category: string; count: number }[]>([]);
+  const [ratingData, setRatingData] = useState<any[]>([]);
   const [averageRatingData, setAverageRatingData] = useState<{ time: string; avgRating: number }[]>([]);
+
+  useEffect(() => {
+    const handleCategoryUpdate = (event: any) => {
+      // Format the data from backend to match your chart format
+      const data = event.detail.data;
+      const formattedData = data.map((item: any) => ({
+        category: item[0],
+        count: item[1]
+      }));
+      setCategoryData(formattedData);
+    };
+    
+    const handleRatingUpdate = (event: any) => {
+      // Format the data from backend
+      const data = event.detail.data;
+      const formattedData = data.map((item: any) => ({
+        category: item[0],
+        rating: item[1]
+      }));
+      setRatingData(formattedData);
+    };
+    
+    // Add event listeners
+    window.addEventListener('categoryDataUpdate', handleCategoryUpdate);
+    window.addEventListener('ratingDataUpdate', handleRatingUpdate);
+    
+    return () => {
+      // Clean up
+      window.removeEventListener('categoryDataUpdate', handleCategoryUpdate);
+      window.removeEventListener('ratingDataUpdate', handleRatingUpdate);
+    };
+  }, []);
+  
 
   useEffect(() => {
     if (movies.length === 0) return;

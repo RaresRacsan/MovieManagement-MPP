@@ -4,10 +4,13 @@ import "../Styles/App.css";
 import AddMovie from "./AddMovies";
 import UpdateMovie from "./UpdateMovies";
 import Charts from "./Charts";
+import FileUpload from "./FileUpload";
+import SockJS from "sockjs-client";
+import { Client } from "@stomp/stompjs";
 
 // Define keys for local storage
-const PENDING_OPERATIONS_KEY = 'pending_movie_operations';
-const CACHED_MOVIES_KEY = 'cached_movies';
+const PENDING_OPERATIONS_KEY = "pending_movie_operations";
+const CACHED_MOVIES_KEY = "cached_movies";
 
 interface Movie {
   id: number;
@@ -18,7 +21,7 @@ interface Movie {
 }
 
 interface PendingOperation {
-  type: 'add' | 'update' | 'delete';
+  type: "add" | "update" | "delete";
   movie: Movie;
   id?: number; // For delete and update operations
   timestamp: number;
@@ -32,7 +35,9 @@ function MovieList() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
-  const [alphabeticalOrder, setAlphabeticalOrder] = useState<"asc" | "desc" | null>(null);
+  const [alphabeticalOrder, setAlphabeticalOrder] = useState<
+    "asc" | "desc" | null
+  >(null);
   
   const [currentPage, setCurrentPage] = useState(1);
   const moviesPerPage = 10; // Increased for endless scrolling
@@ -45,6 +50,12 @@ function MovieList() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [totalMovies, setTotalMovies] = useState<number>(0);
+
+  // State for WebSocket
+  const [stompClient, setStompClient] = useState<any>(null);
+
+  // State for pagination mode
+  const [isPaginationMode, setIsPaginationMode] = useState<boolean>(false);
 
   // Track online/offline status
   useEffect(() => {
@@ -76,6 +87,77 @@ function MovieList() {
       clearInterval(checkServerInterval);
     };
   }, []);
+
+  // WebSocket connection
+  useEffect(() => {
+    if (isOnline && isServerAvailable) {
+      // Connect to WebSocket
+      const socket = new SockJS("http://localhost:8080/ws");
+      const client = new Client({
+        webSocketFactory: () => socket,
+        onConnect: () => {
+          setStompClient(client);
+  
+          // Subscribe to movie updates
+          client.subscribe("/topic/movies", (message) => {
+            const newMovie = JSON.parse(message.body);
+  
+            // Update movies state
+            setMovies((prevMovies) => {
+              // Check if this movie is already in our list (by id)
+              const movieExists = prevMovies.some(
+                (movie) => movie.id === newMovie.id
+              );
+              if (movieExists) {
+                // Replace the existing movie
+                return prevMovies.map((movie) =>
+                  movie.id === newMovie.id ? newMovie : movie
+                );
+              } else {
+                // Add the new movie to the beginning
+                return [newMovie, ...prevMovies];
+              }
+            });
+  
+            // Update categories list if needed
+            setCategories((prevCategories) => {
+              if (!prevCategories.includes(newMovie.category)) {
+                return [...prevCategories, newMovie.category];
+              }
+              return prevCategories;
+            });
+          });
+  
+          // Subscribe to chart data updates
+          client.subscribe("/topic/charts/categories", (message) => {
+            const categoryData = JSON.parse(message.body);
+            window.dispatchEvent(
+              new CustomEvent("categoryDataUpdate", {
+                detail: { data: categoryData },
+              })
+            );
+          });
+  
+          client.subscribe("/topic/charts/ratings", (message) => {
+            const ratingData = JSON.parse(message.body);
+            window.dispatchEvent(
+              new CustomEvent("ratingDataUpdate", {
+                detail: { data: ratingData },
+              })
+            );
+          });
+        },
+      });
+  
+      client.activate();
+  
+      return () => {
+        if (client.connected) {
+          client.deactivate();
+        }
+      };
+    }
+  }, [isOnline, isServerAvailable]);
 
   // Function to check if server is available
   const checkServerAvailability = async () => {
@@ -208,6 +290,11 @@ function MovieList() {
   // Setup infinite scroll
   useEffect(() => {
     const handleScroll = () => {
+      // Don't handle scroll events if we're in pagination mode
+      if (isPaginationMode) {
+        return;
+      }
+      
       const scrollHeight = document.documentElement.scrollHeight;
       const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
       const clientHeight = document.documentElement.clientHeight;
@@ -219,68 +306,71 @@ function MovieList() {
     
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isLoading, hasMore, movies.length]);
+  }, [isLoading, hasMore, movies.length, isPaginationMode]);
 
-  // Modify the loadMoreMovies function to fix the prevMovies scope issue
-
-const loadMoreMovies = () => {
-  if (isOnline && isServerAvailable && hasMore && !isLoading) {
-    const nextPage = currentPage + 1;
-    setIsLoading(true);
-    setCurrentPage(nextPage);
-    
-    // Determine which API to call based on parameters
-    let url;
-    
-    // Case 1: Filtering is required
-    if (searchQuery || selectedCategories.length > 0 || selectedRating !== null) {
-      url = `http://localhost:8080/api/movies/filter?page=${nextPage}&size=${moviesPerPage}`;
-      
-      if (searchQuery) {
-        url += `&search=${encodeURIComponent(searchQuery)}`;
-      }
-      
-      if (selectedCategories.length > 0) {
-        url += `&categories=${selectedCategories.join(",")}`;
-      }
-      
-      if (selectedRating !== null) {
-        url += `&rating=${selectedRating}`;
-      }
-    }
-    // Case 2: Sorting is required
-    else if (sortOrder || alphabeticalOrder) {
-      url = `http://localhost:8080/api/movies/sort?page=${nextPage}&size=${moviesPerPage}`;
-      
-      // Determine which field to sort by
-      const field = sortOrder ? "rating" : "title";
-      const sortValue = sortOrder || alphabeticalOrder;
-      
-      url += `&field=${field}&order=${sortValue}`;
-    }
-    // Case 3: No sorting or filtering, just get all movies
-    else {
-      url = `http://localhost:8080/api/main?page=${nextPage}&size=${moviesPerPage}`;
+  const loadMoreMovies = () => {
+    if (isPaginationMode) {
+      // Don't load more if we're in pagination mode
+      return;
     }
     
-    fetch(url)
-      .then(response => response.json())
-      .then(data => {
-        // Move all this logic inside the setMovies callback to access prevMovies
-        setMovies(prevMovies => {
-          const newMovies = [...prevMovies, ...(data.content || data)];
-          setHasMore(data.content ? (!data.last) : (data.length === moviesPerPage));
-          setTotalMovies(data.totalElements || newMovies.length);
-          return newMovies;
+    if (isOnline && isServerAvailable && hasMore && !isLoading) {
+      const nextPage = currentPage + 1;
+      setIsLoading(true);
+      setCurrentPage(nextPage);
+      
+      // Determine which API to call based on parameters
+      let url;
+      
+      // Case 1: Filtering is required
+      if (searchQuery || selectedCategories.length > 0 || selectedRating !== null) {
+        url = `http://localhost:8080/api/movies/filter?page=${nextPage - 1}&size=${moviesPerPage}`;
+        
+        if (searchQuery) {
+          url += `&search=${encodeURIComponent(searchQuery)}`;
+        }
+        
+        if (selectedCategories.length > 0) {
+          url += `&categories=${selectedCategories.join(",")}`;
+        }
+        
+        if (selectedRating !== null) {
+          url += `&rating=${selectedRating}`;
+        }
+      }
+      // Case 2: Sorting is required
+      else if (sortOrder || alphabeticalOrder) {
+        url = `http://localhost:8080/api/movies/sort?page=${nextPage - 1}&size=${moviesPerPage}`;
+        
+        // Determine which field to sort by
+        const field = sortOrder ? "rating" : "title";
+        const sortValue = sortOrder || alphabeticalOrder;
+        
+        url += `&field=${field}&order=${sortValue}`;
+      }
+      // Case 3: No sorting or filtering, just get all movies
+      else {
+        url = `http://localhost:8080/api/main?page=${nextPage - 1}&size=${moviesPerPage}`;
+      }
+      
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          // Move all this logic inside the setMovies callback to access prevMovies
+          setMovies(prevMovies => {
+            const newMovies = [...prevMovies, ...(data.content || data)];
+            setHasMore(data.content ? (!data.last) : (data.length === moviesPerPage));
+            setTotalMovies(data.totalElements || newMovies.length);
+            return newMovies;
+          });
+          setIsLoading(false);
+        })
+        .catch(error => {
+          console.error("Error loading more movies:", error);
+          setIsLoading(false);
         });
-        setIsLoading(false);
-      })
-      .catch(error => {
-        console.error("Error loading more movies:", error);
-        setIsLoading(false);
-      });
-  }
-};
+    }
+  };
 
   const fetchAllMovies = () => {
     if (isOnline && isServerAvailable) {
@@ -312,7 +402,8 @@ const loadMoreMovies = () => {
     query: string,
     order: "asc" | "desc" | null = null,
     alphabeticalOrder: "asc" | "desc" | null = null,
-    resetPage: boolean = false
+    resetPage: boolean = false,
+    paginationClick: boolean = false // Add this new parameter
   ) => {
     if (!isOnline || !isServerAvailable) {
       // Use cached data for offline mode
@@ -353,6 +444,11 @@ const loadMoreMovies = () => {
       return;
     }
     
+    // If we're resetting the page or clicking pagination, set loading to true
+    if (resetPage || paginationClick) {
+      setIsLoading(true);
+    }
+    
     // If we're resetting the page, start from page 1
     if (resetPage) {
       setCurrentPage(1);
@@ -363,7 +459,7 @@ const loadMoreMovies = () => {
     
     // Case 1: Filtering is required
     if (query || selectedCategories.length > 0 || selectedRating !== null) {
-      url = `http://localhost:8080/api/movies/filter?page=${resetPage ? 1 : currentPage}&size=${moviesPerPage}`;
+      url = `http://localhost:8080/api/movies/filter?page=${resetPage ? 0 : currentPage - 1}&size=${moviesPerPage}`;
       
       if (query) {
         url += `&search=${encodeURIComponent(query)}`;
@@ -376,10 +472,17 @@ const loadMoreMovies = () => {
       if (selectedRating !== null) {
         url += `&rating=${selectedRating}`;
       }
+      
+      // Add sort parameters to filter endpoint
+      if (order) {
+        url += `&sort=${order}&field=rating`;
+      } else if (alphabeticalOrder) {
+        url += `&sort=${alphabeticalOrder}&field=title`;
+      }
     }
     // Case 2: Sorting is required
     else if (order || alphabeticalOrder) {
-      url = `http://localhost:8080/api/movies/sort?page=${resetPage ? 1 : currentPage}&size=${moviesPerPage}`;
+      url = `http://localhost:8080/api/movies/sort?page=${resetPage ? 0 : currentPage - 1}&size=${moviesPerPage}`;
       
       // Determine which field to sort by
       const field = order ? "rating" : "title";
@@ -389,10 +492,10 @@ const loadMoreMovies = () => {
     }
     // Case 3: No sorting or filtering, just get all movies
     else {
-      url = `http://localhost:8080/api/main?page=${resetPage ? 1 : currentPage}&size=${moviesPerPage}`;
+      url = `http://localhost:8080/api/main?page=${resetPage ? 0 : currentPage - 1}&size=${moviesPerPage}`;
     }
     
-    setIsLoading(true);
+    console.log("API URL:", url);
     
     fetch(url)
       .then((response) => {
@@ -402,18 +505,20 @@ const loadMoreMovies = () => {
         return response.json();
       })
       .then((data) => {
-        // Check if we're getting paginated response
+        // The key change is here - handle pagination differently
         if (data.content) {
-          if (resetPage) {
+          // For pagination clicks, always replace the content
+          if (paginationClick || resetPage) {
             setMovies(data.content);
           } else {
+            // For infinite scroll, append content
             setMovies(prevMovies => currentPage === 1 ? data.content : [...prevMovies, ...data.content]);
           }
           setHasMore(!data.last);
           setTotalMovies(data.totalElements);
         } else {
           // Handle non-paginated response
-          if (resetPage) {
+          if (paginationClick || resetPage) {
             setMovies(data);
           } else {
             setMovies(prevMovies => currentPage === 1 ? data : [...prevMovies, ...data]);
@@ -496,7 +601,7 @@ const loadMoreMovies = () => {
     // Reset to page 1 when changing sort order
     fetchMovies(searchQuery, newOrder, null, true);
   };
-  
+
   const toggleAlphabeticalOrder = () => {
     const newOrder = alphabeticalOrder === "asc" ? "desc" : "asc";
     setAlphabeticalOrder(newOrder);
@@ -531,7 +636,8 @@ const loadMoreMovies = () => {
   };
 
   const getRatingClass = (rating: number) => {
-    // Your existing implementation
+    if (movies.length === 0) return "";
+    
     const ratings = movies.map((movie) => movie.rating);
     const maxRating = Math.max(...ratings);
     const minRating = Math.min(...ratings);
@@ -667,9 +773,62 @@ const loadMoreMovies = () => {
         )}
       </div>
 
-      <Link to="/add" className="add-btn">
-        ✚ Add New Movie
-      </Link>
+      {/* Pagination Controls */}
+      <div className="pagination-controls">
+        <button 
+          onClick={() => {
+            if (currentPage > 1) {
+              const newPage = currentPage - 1;
+              setCurrentPage(newPage);
+              setIsPaginationMode(true); // Enable pagination mode
+              fetchMovies(searchQuery, sortOrder, alphabeticalOrder, false, true); // The true flag indicates pagination click
+            }
+          }}
+          disabled={currentPage === 1 || isLoading}
+          className="pagination-btn"
+        >
+          Previous
+        </button>
+        
+        <span className="page-indicator">
+          Page {currentPage} of {Math.ceil(totalMovies / moviesPerPage) || 1}
+        </span>
+        
+        <button 
+          onClick={() => {
+            if (hasMore) {
+              const newPage = currentPage + 1;
+              setCurrentPage(newPage);
+              setIsPaginationMode(true); // Enable pagination mode
+              fetchMovies(searchQuery, sortOrder, alphabeticalOrder, false, true); // The true flag indicates pagination click
+            }
+          }}
+          disabled={!hasMore || isLoading}
+          className="pagination-btn"
+        >
+          Next
+        </button>
+        
+        <button
+          onClick={() => {
+            setIsPaginationMode(!isPaginationMode); // Toggle pagination mode
+            setCurrentPage(1); // Reset to page 1
+            fetchMovies(searchQuery, sortOrder, alphabeticalOrder, true); // Reset to first page
+          }}
+          className="pagination-btn switch-mode-btn"
+        >
+          {isPaginationMode ? "Switch to Infinite Scroll" : "Switch to Pagination"}
+        </button>
+      </div>
+
+      <div className="action-buttons">
+        <Link to="/add" className="add-btn">
+          ✚ Add New Movie
+        </Link>
+        <Link to="/files" className="files-btn">
+          📁 File Upload
+        </Link>
+      </div>
 
       <Charts movies={movies} />
     </div>
@@ -751,6 +910,7 @@ function App() {
         <Route path="/" element={<MovieList />} />
         <Route path="/add" element={<AddMovie />} />
         <Route path="/update/:id" element={<UpdateMovie />} />
+        <Route path="/files" element={<FileUpload />} />
       </Routes>
     </Router>
   );
