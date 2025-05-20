@@ -1,0 +1,7 @@
+com\example\demo\model\Movie.class
+com\example\demo\controller\FileController.class
+com\example\demo\DemoApplication.class
+com\example\demo\repository\MovieRepository.class
+com\example\demo\config\WebSocketConfig.class
+com\example\demo\controller\MainController.class
+com\example\demo\service\MovieGeneratorService.class
