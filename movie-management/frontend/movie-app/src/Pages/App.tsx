@@ -54,9 +54,6 @@ function MovieList() {
   // State for WebSocket
   const [stompClient, setStompClient] = useState<any>(null);
 
-  // State for pagination mode
-  const [isPaginationMode, setIsPaginationMode] = useState<boolean>(false);
-
   // Track online/offline status
   useEffect(() => {
     const handleOnline = () => {
@@ -290,11 +287,6 @@ function MovieList() {
   // Setup infinite scroll
   useEffect(() => {
     const handleScroll = () => {
-      // Don't handle scroll events if we're in pagination mode
-      if (isPaginationMode) {
-        return;
-      }
-      
       const scrollHeight = document.documentElement.scrollHeight;
       const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
       const clientHeight = document.documentElement.clientHeight;
@@ -306,14 +298,10 @@ function MovieList() {
     
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isLoading, hasMore, movies.length, isPaginationMode]);
+  }, [isLoading, hasMore, movies.length]);  // Remove isPaginationMode from dependencies
+  
 
   const loadMoreMovies = () => {
-    if (isPaginationMode) {
-      // Don't load more if we're in pagination mode
-      return;
-    }
-    
     if (isOnline && isServerAvailable && hasMore && !isLoading) {
       const nextPage = currentPage + 1;
       setIsLoading(true);
@@ -403,8 +391,7 @@ function MovieList() {
     order: "asc" | "desc" | null = null,
     alphabeticalOrder: "asc" | "desc" | null = null,
     resetPage: boolean = false,
-    paginationClick: boolean = false // Add this new parameter
-  ) => {
+    ) => {
     if (!isOnline || !isServerAvailable) {
       // Use cached data for offline mode
       let cachedMovies = getMoviesFromCache();
@@ -445,8 +432,9 @@ function MovieList() {
     }
     
     // If we're resetting the page or clicking pagination, set loading to true
-    if (resetPage || paginationClick) {
+    if (resetPage) {
       setIsLoading(true);
+      setCurrentPage(1);
     }
     
     // If we're resetting the page, start from page 1
@@ -498,40 +486,29 @@ function MovieList() {
     console.log("API URL:", url);
     
     fetch(url)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then((data) => {
-        // The key change is here - handle pagination differently
-        if (data.content) {
-          // For pagination clicks, always replace the content
-          if (paginationClick || resetPage) {
-            setMovies(data.content);
-          } else {
-            // For infinite scroll, append content
-            setMovies(prevMovies => currentPage === 1 ? data.content : [...prevMovies, ...data.content]);
-          }
-          setHasMore(!data.last);
-          setTotalMovies(data.totalElements);
-        } else {
-          // Handle non-paginated response
-          if (paginationClick || resetPage) {
-            setMovies(data);
-          } else {
-            setMovies(prevMovies => currentPage === 1 ? data : [...prevMovies, ...data]);
-          }
-          setHasMore(data.length === moviesPerPage);
-        }
-        
-        // Cache the complete set of movies for offline use
-        saveMoviesToCache(data.content || data);
-        setIsLoading(false);
-        setIsServerAvailable(true);
-      })
-      .catch((error) => {
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      // Simplify this logic - always use append mode for scroll
+      if (data.content) {
+        setMovies(prevMovies => resetPage ? data.content : [...prevMovies, ...data.content]);
+        setHasMore(!data.last);
+        setTotalMovies(data.totalElements);
+      } else {
+        setMovies(prevMovies => resetPage ? data : [...prevMovies, ...data]);
+        setHasMore(data.length === moviesPerPage);
+      }
+      
+      // Cache the movies for offline use
+      saveMoviesToCache(data.content || data);
+      setIsLoading(false);
+      setIsServerAvailable(true);
+    })
+    .catch((error) => {
         console.error("Error fetching data:", error);
         setIsServerAvailable(false);
         setIsLoading(false);
@@ -771,54 +748,6 @@ function MovieList() {
             <p>You've reached the end!</p>
           </div>
         )}
-      </div>
-
-      {/* Pagination Controls */}
-      <div className="pagination-controls">
-        <button 
-          onClick={() => {
-            if (currentPage > 1) {
-              const newPage = currentPage - 1;
-              setCurrentPage(newPage);
-              setIsPaginationMode(true); // Enable pagination mode
-              fetchMovies(searchQuery, sortOrder, alphabeticalOrder, false, true); // The true flag indicates pagination click
-            }
-          }}
-          disabled={currentPage === 1 || isLoading}
-          className="pagination-btn"
-        >
-          Previous
-        </button>
-        
-        <span className="page-indicator">
-          Page {currentPage} of {Math.ceil(totalMovies / moviesPerPage) || 1}
-        </span>
-        
-        <button 
-          onClick={() => {
-            if (hasMore) {
-              const newPage = currentPage + 1;
-              setCurrentPage(newPage);
-              setIsPaginationMode(true); // Enable pagination mode
-              fetchMovies(searchQuery, sortOrder, alphabeticalOrder, false, true); // The true flag indicates pagination click
-            }
-          }}
-          disabled={!hasMore || isLoading}
-          className="pagination-btn"
-        >
-          Next
-        </button>
-        
-        <button
-          onClick={() => {
-            setIsPaginationMode(!isPaginationMode); // Toggle pagination mode
-            setCurrentPage(1); // Reset to page 1
-            fetchMovies(searchQuery, sortOrder, alphabeticalOrder, true); // Reset to first page
-          }}
-          className="pagination-btn switch-mode-btn"
-        >
-          {isPaginationMode ? "Switch to Infinite Scroll" : "Switch to Pagination"}
-        </button>
       </div>
 
       <div className="action-buttons">
