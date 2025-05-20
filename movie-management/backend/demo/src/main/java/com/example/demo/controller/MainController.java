@@ -14,7 +14,7 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "*")
 public class MainController {
     private final MovieRepository movieRepository;
 
@@ -29,7 +29,7 @@ public class MainController {
     }
 
     @GetMapping("/main")
-    @CrossOrigin(origins = "http://localhost:3000")
+    @CrossOrigin(origins = "*")
     public Page<Movie> getAllMovies(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -43,7 +43,7 @@ public class MainController {
     }
 
     @GetMapping("/movie/{id}")
-    @CrossOrigin(origins = "http://localhost:3000")
+    @CrossOrigin(origins = "*")
     public ResponseEntity<Movie> getMovieById(@PathVariable Integer id) {
         return movieRepository.findById(id)
                 .map(movie -> ResponseEntity.ok().body(movie))
@@ -66,7 +66,7 @@ public class MainController {
     }
 
     @DeleteMapping("/delete/{id}")
-    @CrossOrigin(origins = "http://localhost::3000")
+    @CrossOrigin(origins = "*")
     public ResponseEntity<Void> deleteMovie(@PathVariable Integer id) {
         try {
             movieRepository.deleteById(id);
@@ -99,7 +99,7 @@ public class MainController {
     }
 
     @GetMapping("/movies/sort")
-    @CrossOrigin(origins = "http://localhost:3000")
+    @CrossOrigin(origins = "*")
     public Page<Movie> sortMovies(
             @RequestParam String field,
             @RequestParam String order,
@@ -114,7 +114,7 @@ public class MainController {
     }
 
     @GetMapping("/movies/filter")
-    @CrossOrigin(origins = "http://localhost:3000")
+    @CrossOrigin(origins = "*")
     public Page<Movie> filterMovies(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) List<String> categories,
