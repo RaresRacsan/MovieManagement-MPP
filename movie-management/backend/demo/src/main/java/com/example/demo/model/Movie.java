@@ -69,4 +69,15 @@ public class Movie {
     public void setCategory(String category) {
         this.category = category;
     }
+
+    /*
+    @ManyToOne
+    @JoinColumn(name = "director_id")
+    private Director director;
+
+    // Getter and setter
+    public Director getDirector() { return director; }
+
+    public void setDirector(Director director) { this.director = director; }
+     */
 }
